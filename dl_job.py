@@ -21,6 +21,7 @@ class DLJob:
     self.f_timetable = []
     self.b_timetable = []
     self.c_timetable = []
+    self.gpu_allocation = []
 
     def load_job_config(self):
         self.job_schedule = pd.read_csv(self.job_config, header = 0)
@@ -29,15 +30,14 @@ class DLJob:
         self.b_timetable = self.job_schedule.backward.tolist()
         self.c_timetable = self.job_schedule.communicate.tolist()
 
-    def run(self):
-        for i in range(self.iters):
-            time.sleep(self.f_timetable[i])
-            # do forward
-            time.sleep(self.b_timetable[i])
-            # do backward
-            time.sleep(self.c_timetable[i])
-            # do communicate
+    def get_forward_schedule(self, iters):
+        return self.f_timetable[iters]
 
+    def get_backward_schedule(self, iters):
+        return self.b_timetable[iters]
+
+    def get_communication_schedule(self, iters):
+        return self.c_timetable[iters]
 
 
 
