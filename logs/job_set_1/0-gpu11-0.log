@@ -1,0 +1,9 @@
+2019-04-10 22:48:53,622 [horovod_trainer.py:105] INFO Configurations: Namespace(job_id=0, job_root='job_configs', job_set='job_set_1')
+2019-04-10 22:48:59,436 [dl_trainer.py:221] INFO target_sparsities: [1.0]
+2019-04-10 22:48:59,438 [dl_trainer.py:231] INFO num_batches_per_epoch: 3125
+2019-04-10 22:51:46,077 [horovod_trainer.py:107] INFO Configurations: Namespace(job_id=0, job_root='job_configs', job_set='job_set_1')
+2019-04-10 22:51:57,601 [dl_trainer.py:221] INFO target_sparsities: [1.0]
+2019-04-10 22:51:57,602 [dl_trainer.py:231] INFO num_batches_per_epoch: 3125
+2019-04-10 22:51:57,616 [horovod_trainer.py:34] INFO 1
+2019-04-10 22:51:57,950 [horovod_trainer.py:40] INFO 2
+2019-04-10 22:52:28,416 [horovod_trainer.py:108] INFO Configurations: Namespace(job_id=0, job_root='job_configs', job_set='job_set_1')

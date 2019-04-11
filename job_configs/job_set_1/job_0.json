@@ -1,7 +1,7 @@
 {
-    "job_id":1,
-    "job_name":"j1",
-    "hostfile":"job_configs/job_set_1/cluster_j1",
+    "job_id":0,
+    "job_name":"j0",
+    "hostfile":"job_configs/job_set_1/cluster_j0",
     "dnn":"resnet20",
     "lr":0.1,
     "batch_size":8,

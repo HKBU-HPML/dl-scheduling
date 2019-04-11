@@ -25,10 +25,9 @@ import models
 import logging
 import utils
 from LR import LRSchedule
-from encoding import huffman
+#from encoding import huffman
 from tensorboardX import SummaryWriter
 from datasets import DatasetHDF5
-writer = SummaryWriter()
 
 import ptb_reader
 import models.lstm as lstmpy
@@ -37,6 +36,7 @@ import json
 
 torch.manual_seed(0)
 torch.set_num_threads(1)
+writer = None
 
 _support_dataset = ['imagenet', 'cifar10']
 _support_cnns = ['resnet20', 'resnet50', 'vgg19', 'alexnet']
@@ -44,8 +44,6 @@ _support_cnns = ['resnet20', 'resnet50', 'vgg19', 'alexnet']
 NUM_CPU_THREADS=1
 
 process = psutil.Process(os.getpid())
-
-
 
 
 def init_processes(rank, size, backend='tcp', master='gpu10'):
@@ -112,12 +110,13 @@ def create_net(num_classes, dnn='resnet20', **kwargs):
 class DLTrainer:
 
     # todo =================
-    def __init__(self, rank, size, master='gpu10', dist=True, ngpus=1, batch_size=32, 
+    def __init__(self, rank, master='gpu10', dist=True, ngpus=1, batch_size=32, 
         is_weak_scaling=True, data_dir='./data', dataset='cifar10', dnn='resnet20', 
         lr=0.04, nworkers=1, prefix=None, sparsity=0.95, pretrain=None, num_steps=35):
 
-        self.size = size
         self.rank = rank
+        if self.rank == 0:
+            writer = SummaryWriter()
         self.pretrain = pretrain
         self.dataset = dataset
         self.prefix=prefix
@@ -175,7 +174,7 @@ class DLTrainer:
         self.master = master
         self.average_iter = 0
         if dist:
-            init_processes(rank, size, master=master)
+            init_processes(rank, nworkers, master=master)
         if self.dataset != 'an4':
             if self.is_cuda:
                 self.criterion = nn.CrossEntropyLoss().cuda()
@@ -963,7 +962,7 @@ class DLTrainer:
         original_size = len(dumps) 
         if settings.SPARSE:
             #dumps = huffman.fullencode(dumps)
-            dumps = huffman.encode_with_indexs(param)
+            #dumps = huffman.encode_with_indexs(param)
             self.compression_ratios.append(original_size*1.0/len(dumps))
         return dumps
 
@@ -975,7 +974,7 @@ class DLTrainer:
                     gpu_mem = self.gpu_caches.get(name, None)
                 else:
                     gpu_mem = None
-                data = huffman.decode_with_indexs(data, gpu_mem)
+                #data = huffman.decode_with_indexs(data, gpu_mem)
                 if self.is_cuda and gpu_mem is None and settings.GPU_CONSTRUCTION:
                     data = torch.from_numpy(data)
                     self.gpu_caches[name] = data.cuda()
