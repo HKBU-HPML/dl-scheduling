@@ -1,0 +1,5 @@
+2019-04-11 18:00:15,727 [horovod_trainer.py:105] INFO Configurations: Namespace(job_id=1, job_root='job_configs', job_set='job_set_1')
+2019-04-11 18:00:20,612 [dl_trainer.py:221] INFO target_sparsities: [1.0]
+2019-04-11 18:00:20,614 [dl_trainer.py:231] INFO num_batches_per_epoch: 3125
+2019-04-11 18:00:21,524 [horovod_trainer.py:68] INFO Time per iteration including communication: 0.286423. Speed: 27.930674 images/s
+2019-04-11 18:00:21,612 [horovod_trainer.py:68] INFO Time per iteration including communication: 0.086930. Speed: 92.028030 images/s
