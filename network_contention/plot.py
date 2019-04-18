@@ -16,9 +16,12 @@ def main():
         
         latency = []
         for job_num in job_nums:
+            print "logs/job_n%d_s%d/job_1.log" % (job_num, msg_size)
             latency.append(parse_log("logs/job_n%d_s%d/job_1.log" % (job_num, msg_size)))
 
-        plt.plot(job_num, latency)
+        #plt.plot(job_num, latency)
+        throughput = [msg_size / l for l in latency]
+        plt.plot(throughput)
     plt.show()
 
 if __name__ == '__main__':
