@@ -18,32 +18,41 @@ def parse_log(log_root):
             content = f.readlines()
         latencies.append(float(content[-1].split()[-1]))
 
-    return np.mean(latencies)
+    #return np.mean(latencies)
     #return min(latencies)
+    return latencies
 
 def main():
 
-    job_nums = [1, 2, 4, 8, 16]
-    msg_sizes = [1024, 4096, 16384, 65536, 262144]
-    ther_max = [12.5 / 2**n for n in range(len(job_nums))]
+    job_nums = [1, 2, 4, 8, 16, 32]
+    msg_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144]
+    ther_max = [12.5 for n in range(len(job_nums))]
+    #thrt_max = [12.5 for n in range(len(job_nums))]
 
+    fig, ax = plt.subplots(figsize = (12, 8))
     for msg_size in msg_sizes:
         
-        latency = []
+        throughput = []
         for job_num in job_nums:
-            latency.append(parse_log("logs/job_n%d_s%d" % (job_num, msg_size)))
+            #latency.append(parse_log("logs/job_n%d_s%d" % (job_num, msg_size)))
+            throughput.append(sum([msg_size / l for l in parse_log("logs/job_n%d_s%d" % (job_num, msg_size))]))
 
         #plt.plot(job_num, latency)
-        throughput = [msg_size / l for l in latency]
+        #throughput = [msg_size / l for l in latency]
         marker = markeriter.next()
         color = coloriter.next()
-        plt.plot(throughput, label="n%d_s%d" % (job_num, msg_size), marker=marker, markerfacecolor='none', color=color)
+        ax.plot(throughput, label="size=%d B" % (msg_size), marker=marker, markerfacecolor='none', color=color)
     marker = markeriter.next()
     color = coloriter.next()
-    plt.plot(ther_max, label="theoretical max", marker=marker, markerfacecolor='none', color=color)
+    ax.plot(ther_max, label="theoretical Full-Occupied", marker=marker, markerfacecolor='none', color=color)
         
-    plt.grid(linestyle=':')
-    plt.legend()
+    ax.set_xlabel("Job Number", size=18)
+    ax.set_ylabel("Throughput/MB", size=18)
+    ax.yaxis.set_tick_params(labelsize=18)
+    ax.set_ylim(top=35)
+    ax.set_xticklabels([0, 1, 2, 4, 8, 16, 32], size=18)
+    ax.grid(linestyle=':')
+    ax.legend(fontsize=18, loc='upper left')
     plt.show()
 
 if __name__ == '__main__':
