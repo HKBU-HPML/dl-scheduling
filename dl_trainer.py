@@ -841,6 +841,153 @@ class DLTrainer:
             return num_of_iters, hidden
         return num_of_iters
 
+    def train_forward(self, data=None, hidden=None):
+        self.loss = 0.0
+        self.fw_loss = None
+
+        s = time.time()
+        self.adjust_learning_rate(self.train_epoch, self.optimizer)
+
+        if self.train_iter % self.num_batches_per_epoch == 0 and self.train_iter > 0:
+            logger.info('train iter: %d, num_batches_per_epoch: %d', self.train_iter, self.num_batches_per_epoch)
+            #self.adjust_learning_rate(self.train_epoch, self.optimizer)
+            logger.info('Epoch %d, avg train acc: %f, lr: %f, avg loss: %f' % (self.train_iter//self.num_batches_per_epoch, np.mean(self.train_acc_top1), self.lr, self.avg_loss_per_epoch/self.num_batches_per_epoch))
+            mean_s = np.mean(self.sparsities)
+            if self.train_iter>0 and np.isnan(mean_s):
+                logger.error('NaN detected! sparsities:  %s' % self.sparsities)
+                #sys.exit('NaN detected!!')
+            logger.info('Average Sparsity: %f, compression ratio: %f, communication size: %f', np.mean(self.sparsities), np.mean(self.compression_ratios), np.mean(self.communication_sizes))
+            self.sparsities = []
+            self.compression_ratios = []
+            self.communication_sizes = []
+            self.train_acc_top1 = []
+            #self.test(self.train_epoch)
+            self.epochs_info.append(self.avg_loss_per_epoch/self.num_batches_per_epoch)
+            self.avg_loss_per_epoch = 0.0
+            #self.data_iterator = iter(self.trainloader)
+            #if self.train_iter > 0 and self.train_iter % 100 == 0:
+            #    self.print_weight_gradient_ratio()
+
+            ## Save checkpoint
+            #if self.train_iter > 0 and self.train_epoch % 5 == 0 and self.rank == 0:
+            #    state = {'iter': self.train_iter, 'epoch': self.train_epoch, 'state': self.get_model_state()}
+            #    if self.prefix:
+            #        relative_path = './weights/%s/%s-n%d-bs%d-lr%.4f' % (self.prefix, self.dnn, self.nworkers, self.batch_size, self.base_lr)
+            #    else:
+            #        relative_path = './weights/%s-n%d-bs%d-lr%.4f' % (self.dnn, self.nworkers, self.batch_size, self.base_lr)
+            #    if settings.SPARSE:
+            #        relative_path += '-s%.5f' % self.sparsity
+            #    utils.create_path(relative_path)
+            #    filename = '%s-rank%d-epoch%d.pth'%(self.dnn, self.rank, self.train_epoch)
+            #    fn = os.path.join(relative_path, filename)
+            #    self.save_checkpoint(state, fn)
+            #    #self.remove_dict(state)
+
+            self.train_epoch += 1
+            # todo zhtang an4 ===========
+            if self.train_sampler and (self.nworkers > 1):
+                # print(" In training :  self.train_sampler.set_epoch(self.train_epoch)  ")
+                self.train_sampler.set_epoch(self.train_epoch)
+
+        ss = time.time()
+        if data is None:
+            data = self.data_iter()
+
+        if self.dataset == 'an4':
+            inputs, labels_cpu, input_percentages, target_sizes = data
+            input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+        else:
+            inputs, labels_cpu = data
+        if self.is_cuda:
+            if self.dnn == 'lstm' :
+                inputs = Variable(inputs.transpose(0, 1).contiguous()).cuda()
+                labels = Variable(labels_cpu.transpose(0, 1).contiguous()).cuda()
+            else:
+                inputs, labels = inputs.cuda(non_blocking=True), labels_cpu.cuda(non_blocking=True)
+        else:
+            labels = labels_cpu
+            
+        # wrap them in Variable
+        #inputs, labels = Variable(inputs), Variable(labels)
+        #logger.info('[%d] labels: %s', self.train_iter, labels_cpu)
+        self.iotime += (time.time() - ss)
+        
+        if self.dnn == 'lstman4':
+            out, output_sizes = self.net(inputs, input_sizes)
+            out = out.transpose(0, 1)  # TxNxH
+            self.fw_loss= self.criterion(out, labels_cpu, output_sizes, target_sizes)
+            self.fw_loss = self.fw_loss / inputs.size(0)  # average the loss by minibatch
+
+        elif self.dnn == 'lstm' :
+            hidden = lstmpy.repackage_hidden(hidden)
+            #print(inputs.size(), hidden[0].size(), hidden[1].size())
+            outputs, hidden = self.net(inputs, hidden)
+            tt = torch.squeeze(labels.view(-1, self.net.batch_size * self.net.num_steps))
+            self.fw_loss = self.criterion(outputs.view(-1, self.net.vocab_size), tt)
+
+        else:
+            # forward + backward + optimize
+            outputs = self.net(inputs)
+            self.fw_loss = self.criterion(outputs, labels)
+            
+        # todo zhtang====
+        if self.dnn == 'lstm':
+            return num_of_iters, hidden
+        return num_of_iters
+
+    def train_backward(self, data=None):
+
+        if self.dnn == 'lstman4':
+            self.fw_loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.net.parameters(), 400)
+
+        elif self.dnn == 'lstm' :
+            self.fw_loss.backward()
+            torch.nn.utils.clip_grad_norm(self.net.parameters(), 0.25)
+            for p in self.net.parameters():
+                p.data.add_(-self.lr, p.grad.data)
+
+        else:
+            # forward + backward + optimize
+            self.fw_loss.backward()
+
+        loss_value = self.fw_loss.item()
+        # logger.info statistics
+        self.loss += loss_value 
+
+        self.avg_loss_per_epoch += loss_value
+
+        # todo zhtang an4 ==================
+        if self.dnn not in ['lstm', 'lstman4']:
+            acc1, = self.cal_accuracy(outputs, labels, topk=(1,))
+            self.train_acc_top1.append(acc1)
+                
+            self.train_iter += 1
+        self.num_of_updates_during_comm += 1
+        self.loss /= num_of_iters 
+        self.timer += time.time() - s 
+        display = 100
+        if self.train_iter % display == 0:
+            logger.info('[%3d][%5d/%5d][rank:%d] loss: %.3f, average forward and backward time: %f, iotime: %f ' %
+                  (self.train_epoch, self.train_iter, self.num_batches_per_epoch, self.rank,  self.loss, self.timer/display, self.iotime/display))
+            mbytes = 1024.*1024
+            logger.info('GPU memory usage memory_allocated: %d MBytes, max_memory_allocated: %d MBytes, memory_cached: %d MBytes, max_memory_cached: %d MBytes, CPU memory usage: %d MBytes', 
+                    ct.memory_allocated()/mbytes, ct.max_memory_allocated()/mbytes, ct.memory_cached()/mbytes, ct.max_memory_cached()/mbytes, process.memory_info().rss/mbytes)
+            self.timer = 0.0
+            self.iotime = 0.0
+            if len(self.delays) > 0:
+                delay = int(np.mean(self.delays))
+            else:
+                delay = 0
+            logger.info('Delay interval: %d, average delay: %d', self.num_of_updates_during_comm- self.average_iter, delay)
+            self.delays = []
+            if self.is_cuda:
+                torch.cuda.empty_cache()
+            self.print_weight_gradient_ratio()
+            
+        return num_of_iters
+
+
     def test(self, epoch):
         self.net.eval()
         test_loss = 0

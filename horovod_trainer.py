@@ -17,14 +17,19 @@ from dl_job import DLJob
 
 from settings import logger, formatter
 
+def ssgd_with_horovod(job, mode):
 
-def ssgd_with_horovod(job):
     rank = hvd.rank()
-    torch.cuda.set_device(job.device_ids[rank])
+    if job.cuda:
+        ngpus=1
+        torch.cuda.set_device(job.device_ids[rank])
+    else:
+        ngpus=-1
+
     if rank != 0:
         pretrain = None
 
-    trainer = DLTrainer(rank, dist=False, batch_size=job.batch_size, is_weak_scaling=True, ngpus=1, data_dir=job.data_dir, dataset=job.dataset, dnn=job.dnn, lr=job.lr, nworkers=job.nworkers, prefix='allreduce')
+    trainer = DLTrainer(rank, dist=False, batch_size=job.batch_size, is_weak_scaling=True, ngpus=ngpus, data_dir=job.data_dir, dataset=job.dataset, dnn=job.dnn, lr=job.lr, nworkers=job.nworkers, prefix='allreduce')
 
     init_epoch = torch.ones(1) * trainer.get_train_epoch()
     init_iter = torch.ones(1) * trainer.get_train_iter()
@@ -41,27 +46,44 @@ def ssgd_with_horovod(job):
     #display = 20 if iters_per_epoch > 20 else iters_per_epoch-1
     display = 1
     nsteps_update = job.nsteps_update
-    # todo zhtang ============
+
+    # to integrate in LSTM code
     hidden = None
     dnn = job.dnn
     if dnn == 'lstm':
         hidden = trainer.net.init_hidden()
+
     for i in range(job.iters):
+
         s = time.time()
         optimizer.zero_grad()
-        for j in range(nsteps_update):
-            if j < nsteps_update - 1 and nsteps_update > 1:
-                optimizer.local = True
-            else:
-                optimizer.local = False
-            # todo zhtang ==========
+
+        # forward 
+        logger.info("Schedule forward task %d of job %d..." % (i, job.job_id))
+        time.sleep(job.get_forward_schedule(rank, i) * 0.001)
+        if mode == 'simulate':
+            time.sleep((job.fw_time) * 0.001)
+        else:
+            #optimizer.local = True
             if dnn == 'lstm':
                 #print(hidden)
                 #print(" =========== j : %d ===========", j)
-                _, hidden = trainer.train(1, hidden=hidden)
+                _, hidden = trainer.train_forward(1, hidden=hidden)
             else:
-                trainer.train(1)
+                trainer.train_forward(1)
+        # backward
+        logger.info("Schedule backward task %d of job %d..." % (i, job.job_id))
+        time.sleep(job.get_backward_schedule(rank, i) * 0.001)
+        if mode == 'simulate':
+            time.sleep((job.bw_time) * 0.001)
+        else:
+            trainer.train_backward(1) 
+
+        # communication
+        logger.info("Schedule communication task %d of job %d..." % (i, job.job_id))
+        time.sleep(job.get_communication_schedule(rank, i) * 0.001)
         trainer.update_model()
+
         times.append(time.time()-s)
         if i % display == 0 and i > 0: 
             time_per_iter = np.mean(times)
@@ -86,6 +108,7 @@ if __name__ == '__main__':
     parser.add_argument('--job-root', type=str, default="job_configs", help='Specify the root of job sets')
     parser.add_argument('--job-set', type=str, default="job_set_1", help='Specify the job set')
     parser.add_argument('--job-id', type=int, default=0, help='Specify the job id')
+    parser.add_argument('--mode', type=str, default='simulate', help='Specify the running mode', choices=['real', 'simulate'])
     args = parser.parse_args()
 
     # create a job objective
@@ -103,4 +126,4 @@ if __name__ == '__main__':
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr) 
     logger.info('Configurations: %s', args)
-    ssgd_with_horovod(dl_job)
+    ssgd_with_horovod(dl_job, args.mode)

@@ -4,10 +4,10 @@
 #nworkers=4
 #nwpernode=4
 #nstepsupdate=1
-hostfile="${hostfile:-job_configs/job_set_1/cluster_j0}"
-job_root=job_configs
+job_root="${job_root:-job_configs}"
 job_set="${job_set:-job_set_1}"
 job_id="${job_id:-0}"
+hostfile="${hostfile:-job_configs/job_set_1/cluster_j0}"
 PY=/home/comp/qiangwang/anaconda2/bin/python
 MPIPATH=/home/comp/qiangwang/software/openmpi-3.1.0
 $MPIPATH/bin/mpirun --prefix $MPIPATH -hostfile $hostfile -bind-to none -map-by slot \

@@ -1,28 +1,16 @@
 {
     "job_id":0,
     "job_name":"j0",
-    "hostfile":"job_configs/job_set_1/cluster_j0",
     "dnn":"resnet20",
+    "model_size":100,
     "lr":0.1,
     "batch_size":8,
     "dataset":"cifar10",
     "data_dir":"data",
     "nworkers":2,
+    "cuda_enabled":1,
     "nsteps_update":1,
-    "sync_tt":0,
-    "gpus":[2, 3],
     "iters":3,
-    "schedule":{
-        "rank_0": {
-            "forward" : [0, 0, 0],
-            "backward": [0, 0, 0],
-            "comm"    : [0, 0, 0]
-        },
-        "rank_1": {
-            "forward" : [0, 0, 0],
-            "backward": [0, 0, 0],
-            "comm"    : [0, 0, 0]
-        }
-    }
-    
+    "fw_time":10,
+    "bw_time":15
 }
