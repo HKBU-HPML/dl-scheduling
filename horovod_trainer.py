@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import time
+import datetime, pause
 import torch
 import numpy as np
 import argparse, os
@@ -17,7 +18,11 @@ from dl_job import DLJob
 
 from settings import logger, formatter
 
-def ssgd_with_horovod(job, mode):
+def parse_timestamp(time_str):
+    year, month, day, hour, minute, second = [int(elem) for elem in time_str.split("_")]
+    return datetime.datetime(year, month, day, hour, minute, second, 0) + datetime.timedelta(seconds=30)
+
+def ssgd_with_horovod(job, mode, start_dt):
 
     rank = hvd.rank()
     if job.cuda:
@@ -52,6 +57,9 @@ def ssgd_with_horovod(job, mode):
     dnn = job.dnn
     if dnn == 'lstm':
         hidden = trainer.net.init_hidden()
+
+    logger.info("Wait until start time: %s..." % start_dt)
+    pause.until(start_dt)
 
     for i in range(job.iters):
 
@@ -109,6 +117,7 @@ if __name__ == '__main__':
     parser.add_argument('--job-set', type=str, default="job_set_1", help='Specify the job set')
     parser.add_argument('--job-id', type=int, default=0, help='Specify the job id')
     parser.add_argument('--mode', type=str, default='simulate', help='Specify the running mode', choices=['real', 'simulate'])
+    parser.add_argument('--global-sync', type=str, default='2019_6_1_12_0_0_0', help='global synchronization timestamp')
     args = parser.parse_args()
 
     # create a job objective
@@ -126,4 +135,6 @@ if __name__ == '__main__':
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr) 
     logger.info('Configurations: %s', args)
-    ssgd_with_horovod(dl_job, args.mode)
+
+    start_dt = parse_timestamp(args.global_sync)
+    ssgd_with_horovod(dl_job, args.mode, start_dt)

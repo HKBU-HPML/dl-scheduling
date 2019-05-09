@@ -36,7 +36,7 @@ import json
 
 torch.manual_seed(0)
 torch.set_num_threads(1)
-writer = None
+#writer = None
 
 _support_dataset = ['imagenet', 'cifar10']
 _support_cnns = ['resnet20', 'resnet50', 'vgg19', 'alexnet']
@@ -115,8 +115,8 @@ class DLTrainer:
         lr=0.04, nworkers=1, prefix=None, sparsity=0.95, pretrain=None, num_steps=35):
 
         self.rank = rank
-        if self.rank == 0:
-            writer = SummaryWriter()
+        #if self.rank == 0:
+        #    writer = SummaryWriter()
         self.pretrain = pretrain
         self.dataset = dataset
         self.prefix=prefix
@@ -680,10 +680,10 @@ class DLTrainer:
         #own_state = self.net.state_dict()
         #for name, param in own_state.items():
         # Tensorboard
-        if self.rank == 0:
-            for name, param in self.net.named_parameters():
-                #writer.add_histogram(name, param.clone().cpu().data.numpy(), self.train_iter)
-                writer.add_histogram(name, param.grad.clone().cpu().data.numpy(), self.train_iter)
+        #if self.rank == 0:
+        #    for name, param in self.net.named_parameters():
+        #        #writer.add_histogram(name, param.clone().cpu().data.numpy(), self.train_iter)
+        #        writer.add_histogram(name, param.grad.clone().cpu().data.numpy(), self.train_iter)
         return
         for name, param in self.net.named_parameters():
             if param.requires_grad:
@@ -692,7 +692,8 @@ class DLTrainer:
                 logger.info('[%s] = %f, %f, %f', name, wn, gn, wn/gn)
 
     def finish(self):
-        writer.close()
+        #writer.close()
+        pass
 
     def cal_accuracy(self, output, target, topk=(1,)):
         """Computes the accuracy over the k top predictions for the specified values of k"""
