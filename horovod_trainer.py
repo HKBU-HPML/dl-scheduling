@@ -20,14 +20,16 @@ from settings import logger, formatter
 
 def parse_timestamp(time_str):
     year, month, day, hour, minute, second = [int(elem) for elem in time_str.split("_")]
-    return datetime.datetime(year, month, day, hour, minute, second, 0) + datetime.timedelta(seconds=30)
+    return datetime.datetime(year, month, day, hour, minute, second, 0) + datetime.timedelta(seconds=20)
 
 def ssgd_with_horovod(job, mode, start_dt):
 
     rank = hvd.rank()
+    gpu_id = -1
     if job.cuda:
         ngpus=1
-        torch.cuda.set_device(job.device_ids[rank])
+        gpu_id = job.device_ids[rank]
+        torch.cuda.set_device(gpu_id)
     else:
         ngpus=-1
 
@@ -58,17 +60,19 @@ def ssgd_with_horovod(job, mode, start_dt):
     if dnn == 'lstm':
         hidden = trainer.net.init_hidden()
 
-    logger.info("Wait until start time: %s..." % start_dt)
+    logger.info("(Server %s, Job %d, Rank %d, GPU %d) Wait until start time: %s..." % (settings.hostname, job.job_id, rank, gpu_id, start_dt))
     pause.until(start_dt)
 
+    start_slot = time.time()
     for i in range(job.iters):
 
         s = time.time()
         optimizer.zero_grad()
 
         # forward 
-        logger.info("Schedule forward task %d of job %d..." % (i, job.job_id))
         time.sleep(job.get_forward_schedule(rank, i) * 0.001)
+        fw_start_slot=int((time.time() - start_slot) * 1000)
+        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Forward task %d started at slot=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, fw_start_slot))
         if mode == 'simulate':
             time.sleep((job.fw_time) * 0.001)
         else:
@@ -79,24 +83,36 @@ def ssgd_with_horovod(job, mode, start_dt):
                 _, hidden = trainer.train_forward(1, hidden=hidden)
             else:
                 trainer.train_forward(1)
+        fw_end_slot=int((time.time() - start_slot) * 1000)
+        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Forward task %d ended at slot=%d, duration=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, fw_end_slot, fw_end_slot-fw_start_slot))
+
         # backward
-        logger.info("Schedule backward task %d of job %d..." % (i, job.job_id))
         time.sleep(job.get_backward_schedule(rank, i) * 0.001)
+        bw_start_slot=int((time.time() - start_slot) * 1000)
+        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Backward task %d started at slot=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, bw_start_slot))
         if mode == 'simulate':
             time.sleep((job.bw_time) * 0.001)
         else:
             trainer.train_backward(1) 
+        bw_end_slot=int((time.time() - start_slot) * 1000)
+        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Backward task %d ended at slot=%d, duration=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, bw_end_slot, bw_end_slot-bw_start_slot))
 
         # communication
-        logger.info("Schedule communication task %d of job %d..." % (i, job.job_id))
         time.sleep(job.get_communication_schedule(rank, i) * 0.001)
+        comm_start_slot=int((time.time() - start_slot) * 1000)
+        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Comm task %d started at slot=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, comm_start_slot))
         trainer.update_model()
+        comm_end_slot=int((time.time() - start_slot) * 1000)
+        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Comm task %d ended at slot=%d, duration=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, comm_end_slot, comm_end_slot-comm_start_slot))
 
         times.append(time.time()-s)
-        if i % display == 0 and i > 0: 
-            time_per_iter = np.mean(times)
-            logger.info('Time per iteration including communication: %f. Speed: %f images/s', time_per_iter, job.batch_size * nsteps_update / time_per_iter)
-            times = []
+        #if i % display == 0 and i > 0: 
+        #    time_per_iter = np.mean(times)
+        #    logger.info('Time per iteration including communication: %f. Speed: %f images/s', time_per_iter, job.batch_size * nsteps_update / time_per_iter)
+        #    times = []
+
+    end_slot = time.time()
+    logger.info("(Server %s, Job %d, Rank %d, GPU %d) Job ended. Total time is % s." % (settings.hostname, job.job_id, rank, gpu_id, int((end_slot - start_slot)*1000)))
 
 
 if __name__ == '__main__':
