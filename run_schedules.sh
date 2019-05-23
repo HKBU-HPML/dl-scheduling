@@ -1,5 +1,5 @@
 job_root=job_configs
-job_set=job_set_1
+job_set="${job_set:-job_set_1}"
 current_time=$(date +%Y_%m_%d_%H_%M_%S)
 
 job_list=$job_root/$job_set/job_*.json

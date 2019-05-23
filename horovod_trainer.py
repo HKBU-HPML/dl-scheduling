@@ -38,6 +38,9 @@ def ssgd_with_horovod(job, mode, start_dt):
 
     trainer = DLTrainer(rank, dist=False, batch_size=job.batch_size, is_weak_scaling=True, ngpus=ngpus, data_dir=job.data_dir, dataset=job.dataset, dnn=job.dnn, lr=job.lr, nworkers=job.nworkers, prefix='allreduce')
 
+    if mode == 'simulate':
+        synt_model = torch.rand(4, job.model_size * (2**20) / 4 / 4)
+
     init_epoch = torch.ones(1) * trainer.get_train_epoch()
     init_iter = torch.ones(1) * trainer.get_train_iter()
     trainer.set_train_epoch(int(hvd.broadcast(init_epoch, root_rank=0)[0]))
@@ -60,7 +63,7 @@ def ssgd_with_horovod(job, mode, start_dt):
     if dnn == 'lstm':
         hidden = trainer.net.init_hidden()
 
-    logger.info("(Server %s, Job %d, Rank %d, GPU %d) Wait until start time: %s..." % (settings.hostname, job.job_id, rank, gpu_id, start_dt))
+    logger.info("(Server %s, Job %d, Rank %d, GPU %d) Wait until start time: %s." % (settings.hostname, job.job_id, rank, gpu_id, start_dt))
     pause.until(start_dt)
 
     start_slot = time.time()
@@ -68,11 +71,10 @@ def ssgd_with_horovod(job, mode, start_dt):
 
         s = time.time()
         optimizer.zero_grad()
-
+        optimizer.local = False
         # forward 
         time.sleep(job.get_forward_schedule(rank, i) * 0.001)
         fw_start_slot=int((time.time() - start_slot) * 1000)
-        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Forward task %d started at slot=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, fw_start_slot))
         if mode == 'simulate':
             time.sleep((job.fw_time) * 0.001)
         else:
@@ -83,27 +85,32 @@ def ssgd_with_horovod(job, mode, start_dt):
                 _, hidden = trainer.train_forward(1, hidden=hidden)
             else:
                 trainer.train_forward(1)
+                #trainer.train(1)
         fw_end_slot=int((time.time() - start_slot) * 1000)
-        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Forward task %d ended at slot=%d, duration=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, fw_end_slot, fw_end_slot-fw_start_slot))
+        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Forward task %d started at slot=%d, ended at slot=%d, duration=%d." % (settings.hostname, job.job_id, rank, gpu_id, i, fw_start_slot, fw_end_slot, fw_end_slot-fw_start_slot))
 
         # backward
         time.sleep(job.get_backward_schedule(rank, i) * 0.001)
         bw_start_slot=int((time.time() - start_slot) * 1000)
-        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Backward task %d started at slot=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, bw_start_slot))
         if mode == 'simulate':
             time.sleep((job.bw_time) * 0.001)
         else:
             trainer.train_backward(1) 
+            #trainer.train(1) 
+            pass
         bw_end_slot=int((time.time() - start_slot) * 1000)
-        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Backward task %d ended at slot=%d, duration=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, bw_end_slot, bw_end_slot-bw_start_slot))
+        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Backward task %d started at slot=%d, ended at slot=%d, duration=%d." % (settings.hostname, job.job_id, rank, gpu_id, i, bw_start_slot, bw_end_slot, bw_end_slot-bw_start_slot))
 
         # communication
         time.sleep(job.get_communication_schedule(rank, i) * 0.001)
         comm_start_slot=int((time.time() - start_slot) * 1000)
-        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Comm task %d started at slot=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, comm_start_slot))
-        trainer.update_model()
+        if mode == 'simulate':
+            hvd.allreduce(synt_model)
+            pass
+        else:
+            trainer.update_model()
         comm_end_slot=int((time.time() - start_slot) * 1000)
-        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Comm task %d ended at slot=%d, duration=%d..." % (settings.hostname, job.job_id, rank, gpu_id, i, comm_end_slot, comm_end_slot-comm_start_slot))
+        logger.info("(Server %s, Job %d, Rank %d, GPU %d) Comm task %d started at slot=%d, ended at slot=%d, duration=%d." % (settings.hostname, job.job_id, rank, gpu_id, i, comm_start_slot, comm_end_slot, comm_end_slot-comm_start_slot))
 
         times.append(time.time()-s)
         #if i % display == 0 and i > 0: 

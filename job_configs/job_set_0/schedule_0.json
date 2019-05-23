@@ -8,14 +8,14 @@
     "dataset":"cifar10",
     "data_dir":"data",
     "nworkers":2,
-    "cuda_enabled":0,
+    "cuda_enabled":1,
     "nsteps_update":1,
     "iters":3,
     "fw_time":10,
     "bw_time":15,
     "hostfile":"job_configs/job_set_1/cluster_j0",
     "sync_tt":0,
-    "gpus":[-1, -1],
+    "gpus":[0, 0],
     "schedule":{
         "rank_0": {
             "forward" : [0, 0, 0],

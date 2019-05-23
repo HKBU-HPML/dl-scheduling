@@ -842,11 +842,11 @@ class DLTrainer:
             return num_of_iters, hidden
         return num_of_iters
 
-    def train_forward(self, data=None, hidden=None):
+    def train_forward(self, num_of_iters=1, data=None, hidden=None):
         self.loss = 0.0
         self.fw_loss = None
 
-        s = time.time()
+        self.s = time.time()
         self.adjust_learning_rate(self.train_epoch, self.optimizer)
 
         if self.train_iter % self.num_batches_per_epoch == 0 and self.train_iter > 0:
@@ -930,13 +930,14 @@ class DLTrainer:
             # forward + backward + optimize
             outputs = self.net(inputs)
             self.fw_loss = self.criterion(outputs, labels)
-            
+         
+        torch.cuda.synchronize()
         # todo zhtang====
         if self.dnn == 'lstm':
             return num_of_iters, hidden
         return num_of_iters
 
-    def train_backward(self, data=None):
+    def train_backward(self, num_of_iters=1, data=None):
 
         if self.dnn == 'lstman4':
             self.fw_loss.backward()
@@ -947,7 +948,6 @@ class DLTrainer:
             torch.nn.utils.clip_grad_norm(self.net.parameters(), 0.25)
             for p in self.net.parameters():
                 p.data.add_(-self.lr, p.grad.data)
-
         else:
             # forward + backward + optimize
             self.fw_loss.backward()
@@ -958,15 +958,15 @@ class DLTrainer:
 
         self.avg_loss_per_epoch += loss_value
 
-        # todo zhtang an4 ==================
-        if self.dnn not in ['lstm', 'lstman4']:
-            acc1, = self.cal_accuracy(outputs, labels, topk=(1,))
-            self.train_acc_top1.append(acc1)
+        ## todo zhtang an4 ==================
+        #if self.dnn not in ['lstm', 'lstman4']:
+        #    acc1, = self.cal_accuracy(outputs, labels, topk=(1,))
+        #    self.train_acc_top1.append(acc1)
                 
-            self.train_iter += 1
+        self.train_iter += 1
         self.num_of_updates_during_comm += 1
         self.loss /= num_of_iters 
-        self.timer += time.time() - s 
+        self.timer += time.time() - self.s
         display = 100
         if self.train_iter % display == 0:
             logger.info('[%3d][%5d/%5d][rank:%d] loss: %.3f, average forward and backward time: %f, iotime: %f ' %
