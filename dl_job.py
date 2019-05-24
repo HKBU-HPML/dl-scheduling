@@ -43,7 +43,6 @@ class DLJob:
             #self.job_json = json.load(f)
             self.job_json = yaml.safe_load(f)
 
-        self.sync_tt = self.job_json["sync_tt"]
         self.device_ids = self.job_json['gpus']
         if self.cuda:
             self.ngpus = len(self.device_ids)

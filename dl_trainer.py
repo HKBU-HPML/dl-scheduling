@@ -952,6 +952,7 @@ class DLTrainer:
             # forward + backward + optimize
             self.fw_loss.backward()
 
+        torch.cuda.synchronize()
         loss_value = self.fw_loss.item()
         # logger.info statistics
         self.loss += loss_value 

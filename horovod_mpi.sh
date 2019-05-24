@@ -15,4 +15,4 @@ $MPIPATH/bin/mpirun --prefix $MPIPATH -hostfile $hostfile -bind-to none -map-by 
     -x NCCL_DEBUG=INFO -x LD_LIBRARY_PATH -x PATH \
     -mca pml ob1 -mca btl ^openib \
     -x NCCL_P2P_DISABLE=1 \
-    $PY horovod_trainer.py --job-root $job_root --job-set $job_set --job-id $job_id --global-sync $global_sync --mode real
+    $PY horovod_trainer.py --job-root $job_root --job-set $job_set --job-id $job_id --global-sync $global_sync --mode simulate

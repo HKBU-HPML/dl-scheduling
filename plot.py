@@ -49,20 +49,26 @@ def draw_one_worker(fn, y_base, fig, ax):
         x = np.arange(ft[0], ft[1] + 1)
         y_lower = np.ones(ft[2] + 1) * y_base
         y_upper = np.ones(ft[2] + 1) * (y_base + offset)
-        ax.fill_between(x, y_lower, y_upper, facecolor = 'red')
+        ax.plot(x, y_lower, color='k')
+        ax.plot(x, y_upper, color='k')
+        ax.fill_between(x, y_lower, y_upper, facecolor = 'red', hatch='/')
 
     for bt in bw_ts:
         x = np.arange(bt[0], bt[1] + 1)
         y_lower = np.ones(bt[2] + 1) * y_base
         y_upper = np.ones(bt[2] + 1) * (y_base + offset)
-        ax.fill_between(x, y_lower, y_upper, facecolor = 'green')
+        ax.plot(x, y_lower, color='k')
+        ax.plot(x, y_upper, color='k')
+        ax.fill_between(x, y_lower, y_upper, facecolor = 'green', hatch='x')
 
     for ct in comm_ts:
         x = np.arange(ct[0], ct[1] + 1)
         y_lower = np.ones(ct[2] + 1) * y_base
         y_upper = np.ones(ct[2] + 1) * (y_base + offset)
-        ax.fill_between(x, y_lower, y_upper, facecolor = 'blue')
+        ax.plot(x, y_lower, color='k')
+        ax.plot(x, y_upper, color='k')
+        ax.fill_between(x, y_lower, y_upper, facecolor = 'blue', hatch='-')
 
 #draw_one_worker("logs/job_set_1/0-gpu15-0.log", 0.5)
-draw_scheduling("job_set_1")
+draw_scheduling("test_4jobs")
     
