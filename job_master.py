@@ -29,9 +29,11 @@ class job_generator:
             job_json["dnn"] = "resnet20"
             job_json.update(TEMPLATES[job_json["dnn"]])
 
-            job_json["nworkers"] = 2 ** randint(1, 3)
+            #job_json["nworkers"] = 2 ** randint(1, 3)
+            #job_json["cuda_enabled"] = 1
+            job_json["nworkers"] = 2
+            job_json["cuda_enabled"] = 0
             job_json["nsteps_update"] = 1
-            job_json["cuda_enabled"] = 1
             job_json["iters"] = 10
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
@@ -57,9 +59,12 @@ class job_scheduler:
     def direct_schedule(self):
 
         def gpu_allocate(nworkers):
+            #nodes = {
+            #         "gpu10":[i % 4 for i in range(nworkers/2)], 
+            #         "gpu11":[i % 4 for i in range(nworkers/2)], 
+            #}
             nodes = {
-                     "gpu10":[i % 4 for i in range(nworkers/2)], 
-                     "gpu11":[i % 4 for i in range(nworkers/2)], 
+                     "localhost":[-1 for i in range(nworkers)], 
             }
             return nodes
             
@@ -97,8 +102,8 @@ class job_scheduler:
                 yaml.safe_dump(schedule, f)
 
 
-jobG = job_generator("test_1jobs", 1)
+jobG = job_generator("test_1jobs_cpu", 1)
 jobG.random_generate()
-jobS = job_scheduler("test_1jobs")
+jobS = job_scheduler("test_1jobs_cpu")
 jobS.print_jobs()
 jobS.direct_schedule()
