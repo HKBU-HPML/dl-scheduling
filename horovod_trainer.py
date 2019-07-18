@@ -8,9 +8,6 @@ import argparse, os
 import settings
 import utils
 import logging
-from mpi4py import MPI
-comm = MPI.COMM_WORLD
-comm.Set_errhandler(MPI.ERRORS_RETURN)
 
 from dl_trainer import DLTrainer
 import horovod.torch as hvd
@@ -20,7 +17,7 @@ from settings import logger, formatter
 
 def parse_timestamp(time_str):
     year, month, day, hour, minute, second = [int(elem) for elem in time_str.split("_")]
-    return datetime.datetime(year, month, day, hour, minute, second, 0) + datetime.timedelta(seconds=40)
+    return datetime.datetime(year, month, day, hour, minute, second, 0) + datetime.timedelta(seconds=15)
 
 def ssgd_with_horovod(job, mode, start_dt):
 

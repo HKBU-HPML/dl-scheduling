@@ -3,6 +3,7 @@ import glob
 import itertools
 import numpy as np
 import pandas as pd
+import numpy as np
 
 markers=['.','x','o','v','^','<','>','1','2','3','4','8','s','p','*']
 #markers=[None]

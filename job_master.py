@@ -199,9 +199,12 @@ class job_scheduler:
     def write_allocate(self):
 
         def gpu_allocate(nworkers):
+            #nodes = {
+            #         "gpu10":[i % 4 for i in range(nworkers/2)], 
+            #         "gpu11":[i % 4 for i in range(nworkers/2)], 
+            #}
             nodes = {
-                     "gpu10":[i % 4 for i in range(nworkers/2)], 
-                     "gpu11":[i % 4 for i in range(nworkers/2)], 
+                     "localhost":[-1 for i in range(nworkers)], 
             }
             return nodes
             

@@ -235,7 +235,10 @@ class DLTrainer:
         self.model_size = 0
         for name, param in self.net.state_dict().items():
             self.model_size += param.numel()
-        self.residuals = torch.zeros(self.model_size).cuda()  # record the residuals of weight changes
+        if self.is_cuda:
+            self.residuals = torch.zeros(self.model_size).cuda()  # record the residuals of weight changes
+        else:
+            self.residuals = torch.zeros(self.model_size)  # record the residuals of weight changes
         self.remote_model = {}
         self.remote_indexes = {}
         self.indexes_marked = torch.zeros(self.model_size)
@@ -931,7 +934,8 @@ class DLTrainer:
             outputs = self.net(inputs)
             self.fw_loss = self.criterion(outputs, labels)
          
-        torch.cuda.synchronize()
+        if self.is_cuda:
+            torch.cuda.synchronize()
         # todo zhtang====
         if self.dnn == 'lstm':
             return num_of_iters, hidden
@@ -952,7 +956,8 @@ class DLTrainer:
             # forward + backward + optimize
             self.fw_loss.backward()
 
-        torch.cuda.synchronize()
+        if self.is_cuda:
+            torch.cuda.synchronize()
         loss_value = self.fw_loss.item()
         # logger.info statistics
         self.loss += loss_value 
@@ -1011,33 +1016,33 @@ class DLTrainer:
         self.net.train()
 
     def update_model(self):
-        prev_model = {}
-        diff_model = {}
-        if settings.EXCHANGE_MODE == 'TOPK_MODEL':
-            for name, param in self.net.state_dict().items():
-                prev_model[name] = param.clone()
+        #prev_model = {}
+        #diff_model = {}
+        #if settings.EXCHANGE_MODE == 'TOPK_MODEL':
+        #    for name, param in self.net.state_dict().items():
+        #        prev_model[name] = param.clone()
         self.optimizer.step()
         
-        if settings.EXCHANGE_MODE == 'TOPK_MODEL':
-            with torch.no_grad():
-                for name, param in self.net.state_dict().items():
-                    #print([name], param.norm(), prev_model[name].norm())
-                    diff_model[name] = param - prev_model[name]
-                diff_tensor = torch.zeros(self.model_size).cuda()
-                offset = 0
-                for name, param in diff_model.items():
-                    diff_tensor[offset:offset+param.numel()] = param.data.view(param.numel())
-                    offset += param.numel()
-                self.residuals += diff_tensor
-                #print("update residuals with diff_tensor:", self.residuals.norm().cpu())
+        #if settings.EXCHANGE_MODE == 'TOPK_MODEL':
+        #    with torch.no_grad():
+        #        for name, param in self.net.state_dict().items():
+        #            #print([name], param.norm(), prev_model[name].norm())
+        #            diff_model[name] = param - prev_model[name]
+        #        diff_tensor = torch.zeros(self.model_size).cuda()
+        #        offset = 0
+        #        for name, param in diff_model.items():
+        #            diff_tensor[offset:offset+param.numel()] = param.data.view(param.numel())
+        #            offset += param.numel()
+        #        self.residuals += diff_tensor
+        #        #print("update residuals with diff_tensor:", self.residuals.norm().cpu())
 
-        if settings.EXCHANGE_MODE == 'MODEL+GRAD':
-            for name, parameter in self.net.named_parameters():
-                #phok = np.sum([self.m ** i for i in range(1,self.train_iter-self.average_iter+1)])
-                if name not in self.v:
-                    self.v[name] = parameter.grad.clone()
-                else:
-                    self.v[name] = self.m * self.v[name] + parameter.grad
+        #if settings.EXCHANGE_MODE == 'MODEL+GRAD':
+        #    for name, parameter in self.net.named_parameters():
+        #        #phok = np.sum([self.m ** i for i in range(1,self.train_iter-self.average_iter+1)])
+        #        if name not in self.v:
+        #            self.v[name] = parameter.grad.clone()
+        #        else:
+        #            self.v[name] = self.m * self.v[name] + parameter.grad
 
     def encode_param(self, param, name=None):
         if not settings.SPARSE:
