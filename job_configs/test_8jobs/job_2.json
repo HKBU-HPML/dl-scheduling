@@ -1,3 +1,3 @@
-{batch_size: 32, bw_time: 100, cuda_enabled: 1, data_dir: data, dataset: cifar10,
-  dnn: resnet20, fw_time: 100, iters: 10, job_id: 2, job_name: j2, lr: 0.1, model_size: 100,
-  nsteps_update: 1, nworkers: 8}
+{batch_size: 20, bw_time: 100, cuda_enabled: 1, data_dir: data, dataset: ptb, dnn: lstm,
+  fw_time: 100, iters: 5, job_id: 2, job_name: j2, lr: 0.1, model_size: 100, nsteps_update: 1,
+  nworkers: 8}

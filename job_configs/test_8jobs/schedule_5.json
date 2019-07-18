@@ -5,7 +5,7 @@ data_dir: data
 dataset: cifar10
 dnn: resnet20
 fw_time: 100
-gpus: [0, 1, 0, 1]
+gpus: [0, 1, 2, 3, 0, 1, 2, 3]
 hostfile: job_configs/test_8jobs/cluster_j5
 iters: 10
 job_id: 5
@@ -13,7 +13,7 @@ job_name: j5
 lr: 0.1
 model_size: 100
 nsteps_update: 1
-nworkers: 4
+nworkers: 8
 schedule:
   rank_0:
     backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -28,6 +28,22 @@ schedule:
     comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   rank_3:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_4:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_5:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_6:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_7:
     backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

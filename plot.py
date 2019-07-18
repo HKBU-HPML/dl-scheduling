@@ -70,5 +70,5 @@ def draw_one_worker(fn, y_base, fig, ax):
         ax.fill_between(x, y_lower, y_upper, facecolor = 'blue', hatch='-')
 
 #draw_one_worker("logs/job_set_1/0-gpu15-0.log", 0.5)
-draw_scheduling("test_4jobs")
+draw_scheduling("test_8jobs")
     
