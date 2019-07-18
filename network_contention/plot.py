@@ -1,6 +1,7 @@
 #import matplotlib.pyplot as plt
 import glob
 import pandas as pd
+import numpy as np
 
 def parse_log(log_f):
 
@@ -38,8 +39,8 @@ def parse_log(log_f):
     start_frame = start_frame.sort_values(by=['Date', 'Time', 'Microsecond']).loc[len(start_frame) - 1]
     end_frame = end_frame.sort_values(by=['Date', 'Time', 'Microsecond']).loc[0]
 
-    #print start_frame
-    #print end_frame
+    print start_frame
+    print end_frame
 
     latencies = []
     for df in dfs:
