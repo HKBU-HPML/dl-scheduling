@@ -1,0 +1,87 @@
+batch_size: 32
+bw_time: 100
+cuda_enabled: 0
+data_dir: data
+dataset: cifar10
+dnn: resnet20
+fw_time: 100
+gpus:
+- -1
+- -1
+hostfile: job_configs/test_1jobs_cpu/cluster_j0
+iters: 10
+job_id: 0
+job_name: j0
+lr: 0.1
+model_size: 100
+nsteps_update: 1
+nworkers: 2
+schedule:
+  rank_0:
+    backward:
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    comm:
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    forward:
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+  rank_1:
+    backward:
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    comm:
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    forward:
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0
+    - 0

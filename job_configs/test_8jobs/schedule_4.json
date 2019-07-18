@@ -1,0 +1,49 @@
+batch_size: 32
+bw_time: 100
+cuda_enabled: 1
+data_dir: data
+dataset: cifar10
+dnn: resnet20
+fw_time: 100
+gpus: [0, 1, 2, 3, 0, 1, 2, 3]
+hostfile: job_configs/test_8jobs/cluster_j4
+iters: 10
+job_id: 4
+job_name: j4
+lr: 0.1
+model_size: 100
+nsteps_update: 1
+nworkers: 8
+schedule:
+  rank_0:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_1:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_2:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_3:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_4:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_5:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_6:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  rank_7:
+    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

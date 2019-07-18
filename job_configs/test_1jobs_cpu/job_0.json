@@ -1,0 +1,14 @@
+batch_size: 32
+bw_time: 100
+cuda_enabled: 0
+data_dir: data
+dataset: cifar10
+dnn: resnet20
+fw_time: 100
+iters: 10
+job_id: 0
+job_name: j0
+lr: 0.1
+model_size: 100
+nsteps_update: 1
+nworkers: 2

@@ -1,6 +1,6 @@
 {
-    "job_id":1,
-    "job_name":"j1",
+    "job_id":2,
+    "job_name":"j2",
     "dnn":"resnet20",
     "model_size": 100,
     "lr":0.1,

@@ -36,7 +36,7 @@ import json
 
 torch.manual_seed(0)
 torch.set_num_threads(1)
-writer = None
+#writer = None
 
 _support_dataset = ['imagenet', 'cifar10']
 _support_cnns = ['resnet20', 'resnet50', 'vgg19', 'alexnet']
@@ -115,8 +115,8 @@ class DLTrainer:
         lr=0.04, nworkers=1, prefix=None, sparsity=0.95, pretrain=None, num_steps=35):
 
         self.rank = rank
-        if self.rank == 0:
-            writer = SummaryWriter()
+        #if self.rank == 0:
+        #    writer = SummaryWriter()
         self.pretrain = pretrain
         self.dataset = dataset
         self.prefix=prefix
@@ -235,7 +235,10 @@ class DLTrainer:
         self.model_size = 0
         for name, param in self.net.state_dict().items():
             self.model_size += param.numel()
-        self.residuals = torch.zeros(self.model_size).cuda()  # record the residuals of weight changes
+        if self.is_cuda:
+            self.residuals = torch.zeros(self.model_size).cuda()  # record the residuals of weight changes
+        else:
+            self.residuals = torch.zeros(self.model_size)  # record the residuals of weight changes
         self.remote_model = {}
         self.remote_indexes = {}
         self.indexes_marked = torch.zeros(self.model_size)
@@ -680,10 +683,10 @@ class DLTrainer:
         #own_state = self.net.state_dict()
         #for name, param in own_state.items():
         # Tensorboard
-        if self.rank == 0:
-            for name, param in self.net.named_parameters():
-                #writer.add_histogram(name, param.clone().cpu().data.numpy(), self.train_iter)
-                writer.add_histogram(name, param.grad.clone().cpu().data.numpy(), self.train_iter)
+        #if self.rank == 0:
+        #    for name, param in self.net.named_parameters():
+        #        #writer.add_histogram(name, param.clone().cpu().data.numpy(), self.train_iter)
+        #        writer.add_histogram(name, param.grad.clone().cpu().data.numpy(), self.train_iter)
         return
         for name, param in self.net.named_parameters():
             if param.requires_grad:
@@ -692,7 +695,8 @@ class DLTrainer:
                 logger.info('[%s] = %f, %f, %f', name, wn, gn, wn/gn)
 
     def finish(self):
-        writer.close()
+        #writer.close()
+        pass
 
     def cal_accuracy(self, output, target, topk=(1,)):
         """Computes the accuracy over the k top predictions for the specified values of k"""
@@ -841,6 +845,156 @@ class DLTrainer:
             return num_of_iters, hidden
         return num_of_iters
 
+    def train_forward(self, num_of_iters=1, data=None, hidden=None):
+        self.loss = 0.0
+        self.fw_loss = None
+
+        self.s = time.time()
+        self.adjust_learning_rate(self.train_epoch, self.optimizer)
+
+        if self.train_iter % self.num_batches_per_epoch == 0 and self.train_iter > 0:
+            logger.info('train iter: %d, num_batches_per_epoch: %d', self.train_iter, self.num_batches_per_epoch)
+            #self.adjust_learning_rate(self.train_epoch, self.optimizer)
+            logger.info('Epoch %d, avg train acc: %f, lr: %f, avg loss: %f' % (self.train_iter//self.num_batches_per_epoch, np.mean(self.train_acc_top1), self.lr, self.avg_loss_per_epoch/self.num_batches_per_epoch))
+            mean_s = np.mean(self.sparsities)
+            if self.train_iter>0 and np.isnan(mean_s):
+                logger.error('NaN detected! sparsities:  %s' % self.sparsities)
+                #sys.exit('NaN detected!!')
+            logger.info('Average Sparsity: %f, compression ratio: %f, communication size: %f', np.mean(self.sparsities), np.mean(self.compression_ratios), np.mean(self.communication_sizes))
+            self.sparsities = []
+            self.compression_ratios = []
+            self.communication_sizes = []
+            self.train_acc_top1 = []
+            #self.test(self.train_epoch)
+            self.epochs_info.append(self.avg_loss_per_epoch/self.num_batches_per_epoch)
+            self.avg_loss_per_epoch = 0.0
+            #self.data_iterator = iter(self.trainloader)
+            #if self.train_iter > 0 and self.train_iter % 100 == 0:
+            #    self.print_weight_gradient_ratio()
+
+            ## Save checkpoint
+            #if self.train_iter > 0 and self.train_epoch % 5 == 0 and self.rank == 0:
+            #    state = {'iter': self.train_iter, 'epoch': self.train_epoch, 'state': self.get_model_state()}
+            #    if self.prefix:
+            #        relative_path = './weights/%s/%s-n%d-bs%d-lr%.4f' % (self.prefix, self.dnn, self.nworkers, self.batch_size, self.base_lr)
+            #    else:
+            #        relative_path = './weights/%s-n%d-bs%d-lr%.4f' % (self.dnn, self.nworkers, self.batch_size, self.base_lr)
+            #    if settings.SPARSE:
+            #        relative_path += '-s%.5f' % self.sparsity
+            #    utils.create_path(relative_path)
+            #    filename = '%s-rank%d-epoch%d.pth'%(self.dnn, self.rank, self.train_epoch)
+            #    fn = os.path.join(relative_path, filename)
+            #    self.save_checkpoint(state, fn)
+            #    #self.remove_dict(state)
+
+            self.train_epoch += 1
+            # todo zhtang an4 ===========
+            if self.train_sampler and (self.nworkers > 1):
+                # print(" In training :  self.train_sampler.set_epoch(self.train_epoch)  ")
+                self.train_sampler.set_epoch(self.train_epoch)
+
+        ss = time.time()
+        if data is None:
+            data = self.data_iter()
+
+        if self.dataset == 'an4':
+            inputs, labels_cpu, input_percentages, target_sizes = data
+            input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+        else:
+            inputs, labels_cpu = data
+        if self.is_cuda:
+            if self.dnn == 'lstm' :
+                inputs = Variable(inputs.transpose(0, 1).contiguous()).cuda()
+                labels = Variable(labels_cpu.transpose(0, 1).contiguous()).cuda()
+            else:
+                inputs, labels = inputs.cuda(non_blocking=True), labels_cpu.cuda(non_blocking=True)
+        else:
+            labels = labels_cpu
+            
+        # wrap them in Variable
+        #inputs, labels = Variable(inputs), Variable(labels)
+        #logger.info('[%d] labels: %s', self.train_iter, labels_cpu)
+        self.iotime += (time.time() - ss)
+        
+        if self.dnn == 'lstman4':
+            out, output_sizes = self.net(inputs, input_sizes)
+            out = out.transpose(0, 1)  # TxNxH
+            self.fw_loss= self.criterion(out, labels_cpu, output_sizes, target_sizes)
+            self.fw_loss = self.fw_loss / inputs.size(0)  # average the loss by minibatch
+
+        elif self.dnn == 'lstm' :
+            hidden = lstmpy.repackage_hidden(hidden)
+            #print(inputs.size(), hidden[0].size(), hidden[1].size())
+            outputs, hidden = self.net(inputs, hidden)
+            tt = torch.squeeze(labels.view(-1, self.net.batch_size * self.net.num_steps))
+            self.fw_loss = self.criterion(outputs.view(-1, self.net.vocab_size), tt)
+
+        else:
+            # forward + backward + optimize
+            outputs = self.net(inputs)
+            self.fw_loss = self.criterion(outputs, labels)
+         
+        if self.is_cuda:
+            torch.cuda.synchronize()
+        # todo zhtang====
+        if self.dnn == 'lstm':
+            return num_of_iters, hidden
+        return num_of_iters
+
+    def train_backward(self, num_of_iters=1, data=None):
+
+        if self.dnn == 'lstman4':
+            self.fw_loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.net.parameters(), 400)
+
+        elif self.dnn == 'lstm' :
+            self.fw_loss.backward()
+            torch.nn.utils.clip_grad_norm(self.net.parameters(), 0.25)
+            for p in self.net.parameters():
+                p.data.add_(-self.lr, p.grad.data)
+        else:
+            # forward + backward + optimize
+            self.fw_loss.backward()
+
+        if self.is_cuda:
+            torch.cuda.synchronize()
+        loss_value = self.fw_loss.item()
+        # logger.info statistics
+        self.loss += loss_value 
+
+        self.avg_loss_per_epoch += loss_value
+
+        ## todo zhtang an4 ==================
+        #if self.dnn not in ['lstm', 'lstman4']:
+        #    acc1, = self.cal_accuracy(outputs, labels, topk=(1,))
+        #    self.train_acc_top1.append(acc1)
+                
+        self.train_iter += 1
+        self.num_of_updates_during_comm += 1
+        self.loss /= num_of_iters 
+        self.timer += time.time() - self.s
+        display = 100
+        if self.train_iter % display == 0:
+            logger.info('[%3d][%5d/%5d][rank:%d] loss: %.3f, average forward and backward time: %f, iotime: %f ' %
+                  (self.train_epoch, self.train_iter, self.num_batches_per_epoch, self.rank,  self.loss, self.timer/display, self.iotime/display))
+            mbytes = 1024.*1024
+            logger.info('GPU memory usage memory_allocated: %d MBytes, max_memory_allocated: %d MBytes, memory_cached: %d MBytes, max_memory_cached: %d MBytes, CPU memory usage: %d MBytes', 
+                    ct.memory_allocated()/mbytes, ct.max_memory_allocated()/mbytes, ct.memory_cached()/mbytes, ct.max_memory_cached()/mbytes, process.memory_info().rss/mbytes)
+            self.timer = 0.0
+            self.iotime = 0.0
+            if len(self.delays) > 0:
+                delay = int(np.mean(self.delays))
+            else:
+                delay = 0
+            logger.info('Delay interval: %d, average delay: %d', self.num_of_updates_during_comm- self.average_iter, delay)
+            self.delays = []
+            if self.is_cuda:
+                torch.cuda.empty_cache()
+            self.print_weight_gradient_ratio()
+            
+        return num_of_iters
+
+
     def test(self, epoch):
         self.net.eval()
         test_loss = 0
@@ -862,33 +1016,33 @@ class DLTrainer:
         self.net.train()
 
     def update_model(self):
-        prev_model = {}
-        diff_model = {}
-        if settings.EXCHANGE_MODE == 'TOPK_MODEL':
-            for name, param in self.net.state_dict().items():
-                prev_model[name] = param.clone()
+        #prev_model = {}
+        #diff_model = {}
+        #if settings.EXCHANGE_MODE == 'TOPK_MODEL':
+        #    for name, param in self.net.state_dict().items():
+        #        prev_model[name] = param.clone()
         self.optimizer.step()
         
-        if settings.EXCHANGE_MODE == 'TOPK_MODEL':
-            with torch.no_grad():
-                for name, param in self.net.state_dict().items():
-                    #print([name], param.norm(), prev_model[name].norm())
-                    diff_model[name] = param - prev_model[name]
-                diff_tensor = torch.zeros(self.model_size).cuda()
-                offset = 0
-                for name, param in diff_model.items():
-                    diff_tensor[offset:offset+param.numel()] = param.data.view(param.numel())
-                    offset += param.numel()
-                self.residuals += diff_tensor
-                #print("update residuals with diff_tensor:", self.residuals.norm().cpu())
+        #if settings.EXCHANGE_MODE == 'TOPK_MODEL':
+        #    with torch.no_grad():
+        #        for name, param in self.net.state_dict().items():
+        #            #print([name], param.norm(), prev_model[name].norm())
+        #            diff_model[name] = param - prev_model[name]
+        #        diff_tensor = torch.zeros(self.model_size).cuda()
+        #        offset = 0
+        #        for name, param in diff_model.items():
+        #            diff_tensor[offset:offset+param.numel()] = param.data.view(param.numel())
+        #            offset += param.numel()
+        #        self.residuals += diff_tensor
+        #        #print("update residuals with diff_tensor:", self.residuals.norm().cpu())
 
-        if settings.EXCHANGE_MODE == 'MODEL+GRAD':
-            for name, parameter in self.net.named_parameters():
-                #phok = np.sum([self.m ** i for i in range(1,self.train_iter-self.average_iter+1)])
-                if name not in self.v:
-                    self.v[name] = parameter.grad.clone()
-                else:
-                    self.v[name] = self.m * self.v[name] + parameter.grad
+        #if settings.EXCHANGE_MODE == 'MODEL+GRAD':
+        #    for name, parameter in self.net.named_parameters():
+        #        #phok = np.sum([self.m ** i for i in range(1,self.train_iter-self.average_iter+1)])
+        #        if name not in self.v:
+        #            self.v[name] = parameter.grad.clone()
+        #        else:
+        #            self.v[name] = self.m * self.v[name] + parameter.grad
 
     def encode_param(self, param, name=None):
         if not settings.SPARSE:
