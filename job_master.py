@@ -320,9 +320,9 @@ class job_scheduler:
                         comm_jobs.append(job)
 
             #comm_jobs = sorted(comm_jobs, key=lambda x: (-x.model_size))
-            comm_jobs = sorted(comm_jobs, key=lambda x: (x.nworkers, x.model_size))
+            comm_jobs = sorted(comm_jobs, key=lambda x: (-x.nworkers, -x.model_size))
             for job in comm_jobs:
-                if job.is_all_nodes_free(thres=0):
+                if job.is_all_nodes_free(time, thres=0):
                     comm_task = job.get_comm()
                     for node in job.nodes:
                         node.add_run(comm_task, time)
@@ -450,7 +450,7 @@ num_jobs = 16
 
 #jobS = job_scheduler("microsoft-80")
 #jobS.allocate(big_first=False, pick_thres=32)
-jobS = job_scheduler("microsoft-480")
+jobS = job_scheduler("microsoft-80")
 jobS.allocate(big_first=True)
 #jobS.print_jobs()
 jobS.schedule()

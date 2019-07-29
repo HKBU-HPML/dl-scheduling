@@ -44,10 +44,14 @@ class dag_task:
         self.last_change_time = time
 
         if self.speed != old_speed:
-            return "job %d on [%s]: speed: %f, transferred_size: %f, start_time: %f, change_time: %f, end_time: %f, \n" % (self.parent_job.job_id, self.parent_job.get_nodes(), self.speed, self.transferred_size, self.start_time, self.last_change_time, self.end_time)
+            return "job %d on [%s]: old/new speed: %f/%f, transferred_size: %f, rest_size: %f, start_time: %f, change_time: %f, end_time: %f, \n" % (self.parent_job.job_id, self.parent_job.get_nodes(), old_speed, self.speed, self.transferred_size, rest_size, self.start_time, self.last_change_time, self.end_time)
         else:
             return ""
 
+    def get_rest_size(self, time):
+        self.transferred_size += (time - self.last_change_time) * self.speed
+        return self.model_size - self.transferred_size
+        
 class dag_job:
 
     def __init__(self, job_json):
@@ -92,13 +96,38 @@ class dag_job:
     def add_gpu(self, gpu):
         self.gpus.append(gpu)
 
-    def is_all_nodes_free(self, thres=0):
+    def is_all_nodes_free(self, time, thres=0):
         num_comm = 0
+        comm_tasks = []
         for node in self.nodes:
             if len(node.comm_task_list) > num_comm:
                 num_comm = len(node.comm_task_list)
-        return True if num_comm <= thres else False
+                for task in node.comm_task_list:
+                    if not task in comm_tasks:
+                        comm_tasks.append(task)
 
+        #return True if num_comm <= thres else False
+        if thres != 1:
+            return True if num_comm <= thres else False
+        else:
+            if num_comm == 0:
+                return True
+            if num_comm == 1:
+                #print "debug:", len(comm_tasks)
+                judge = 2 + 4 * 0.7 / 7.8125
+                #cur_size = comm_tasks[0].get_rest_size(time)
+                #if (cur_size * 1.0 / self.model_size) > judge:
+                #    return True
+                #else:
+                #    return False
+                for comm_task in comm_tasks:
+                    cur_size = comm_task.get_rest_size(time)
+                    if (cur_size * 1.0 / self.model_size) < judge:
+                        return False
+                return True
+            else:
+                return False
+                
     def initial_task(self):
 
         for i in range(self.nworkers):
