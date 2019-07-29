@@ -5,7 +5,7 @@ class dag_task:
         self.parent_job = job
         self.iter_num = iter_num
         self.task_type = task_type # forward, backward, comm
-        self.model_size = 100
+        self.model_size = job.model_size
 
         self.start_time = -1
         self.end_time = 9999999
@@ -17,7 +17,7 @@ class dag_task:
         self.start_time = time
         self.last_change_time = time
         self.transferred_size = 0
-        self.speed = 1
+        self.speed = 0.128
         self.end_time = time + self.model_size / self.speed
         #self.end_time = time + 40
 
@@ -25,9 +25,11 @@ class dag_task:
         return True if time >= self.end_time else False
 
     def processing(self, time):
-        if time >= self.end_time:
-            self.parent_job.sync_comm()
-            self.go_iter()
+        if self.parent_job.is_comm_stall:
+            if time >= self.end_time:
+                #print "processing:", time
+                self.parent_job.sync_comm(time)
+                self.go_iter()
 
     def __str__(self):
         return str([self.iter_num, self.start_time])
@@ -60,6 +62,11 @@ class dag_job:
         self.fw_time = job_json["fw_time"]
         self.bw_time = job_json["bw_time"]
     
+        # job compute workload
+        self.compute_duration = (self.fw_time + self.bw_time) * self.iters
+        self.gpu_compute_cumul_duration = self.compute_duration * self.nworkers
+        self.comm_duration = self.model_size * self.iters
+
         self.available_tasks = ["" for i in range(self.job_conf["nworkers"])]
         self.finished_tasks = []
 
@@ -71,6 +78,7 @@ class dag_job:
 
         self.comm_task = dag_task(self, 0, "comm")
         self.is_comm_stall = False
+        self.finish_time = 0
 
     def add_node(self, node):
         self.nodes.append(node)
@@ -84,11 +92,12 @@ class dag_job:
     def add_gpu(self, gpu):
         self.gpus.append(gpu)
 
-    def is_all_nodes_free(self):
+    def is_all_nodes_free(self, thres=0):
         num_comm = 0
         for node in self.nodes:
-            num_comm += len(node.comm_task_list)
-        return True if num_comm == 0 else False
+            if len(node.comm_task_list) > num_comm:
+                num_comm = len(node.comm_task_list)
+        return True if num_comm <= thres else False
 
     def initial_task(self):
 
@@ -106,7 +115,7 @@ class dag_job:
         else:
             return False
 
-    def sync_comm(self):
+    def sync_comm(self, time):
         self.is_communicated = [-1 for i in range(self.nworkers)]
         self.is_comm_stall = False
         if self.available_tasks[0]["iter"] < self.iters:
@@ -117,6 +126,7 @@ class dag_job:
             #self.is_communicated = [-1 for i in range(self.nworkers)]
         else:
             self.is_finished = True
+            self.finish_time = time
 
     def get_task(self, worker_id):
         return self.available_tasks[worker_id]
