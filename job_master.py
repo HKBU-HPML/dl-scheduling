@@ -4,6 +4,7 @@ import json, yaml
 from cluster import *
 from job import dag_job
 import numpy as np
+import random
 
 #SUPPORT_NETS = ["resnet20", "lstm", "lstman4", "resnet50"]
 SUPPORT_NETS = ["resnet50", "googlenet", "alexnet"]
@@ -60,8 +61,8 @@ class job_generator:
         if not os.path.exists(self.job_root):
             os.makedirs(self.job_root)
 
-        min_iter = 1
-        max_iter = 6
+        min_iter = 50
+        max_iter = 300
         # 1-GPU jobs
         for i in range(job_dist[0]):
             job_json = {}
@@ -195,15 +196,17 @@ class job_scheduler:
                 job_json = yaml.safe_load(f)
                 self.job_set.append(dag_job(job_json))
 
-    def allocate(self, big_first=False, pick_thres=32):
-        
+    def allocate(self, algo="blf", pick_thres=32): # "ssf", "slf", "bsf", "blf", "random" 
+ 
+        print "Placement Algorithm:", algo
+
         self.job_set.sort(key=lambda x:x.nworkers, reverse=True)
-        self.print_jobs()
+        #self.print_jobs()
 
         def get_node_compute_workload(node):
             return node.get_gpus_workload()
 
-        print ["job-%d-w%d-%d" % (j.job_id, j.nworkers, j.compute_duration) for j in self.job_set]
+        #print ["job-%d-w%d-%d" % (j.job_id, j.nworkers, j.compute_duration) for j in self.job_set]
         # sort the job by some rules
         #self.job_set.sort(key=lambda x:x.gpu_compute_cumul_duration, reverse=True) # by GPU Time
         #print ["job-%d-%d" % (j.job_id, j.gpu_compute_cumul_duration) for j in self.job_set]
@@ -214,12 +217,18 @@ class job_scheduler:
         #self.job_set.sort(key=lambda x:x.nworkers, reverse=True) # by the GPU number
         #print ["job-%d-%d" % (j.job_id, j.nworkers) for j in self.job_set]
 
-        if big_first:
-            self.job_set = sorted(self.job_set, key=lambda x: (-x.nworkers, -x.compute_duration))
-        else:
+        if algo == "ssf":
+            self.job_set = sorted(self.job_set, key=lambda x: (x.nworkers, x.compute_duration))
+        elif algo == "slf":
             self.job_set = sorted(self.job_set, key=lambda x: (x.nworkers, -x.compute_duration))
+        elif algo == "bsf":
+            self.job_set = sorted(self.job_set, key=lambda x: (-x.nworkers, x.compute_duration))
+        elif algo == "blf":
+            self.job_set = sorted(self.job_set, key=lambda x: (-x.nworkers, -x.compute_duration))
+        elif algo == "random":
+            random.shuffle(self.job_set)
             
-        print ["job-%d-w%d-%d" % (j.job_id, j.nworkers, j.compute_duration) for j in self.job_set]
+        #print ["job-%d-w%d-%d" % (j.job_id, j.nworkers, j.compute_duration) for j in self.job_set]
 
         def pick_gpus(job):
 
@@ -275,8 +284,8 @@ class job_scheduler:
         self.clust.gpu_list = sorted(self.clust.gpu_list, key=lambda x: (x.makespan, x.node_id))
         print ["n%d-g%d-%d" % (g.node_id, g.gpu_id, g.makespan) for g in self.clust.gpu_list]
                 
-        for node in self.clust.node_list:
-            node.print_jobs()
+        #for node in self.clust.node_list:
+        #    node.print_jobs()
 
     def check_finished(self):
         finished_ids = []
@@ -286,7 +295,7 @@ class job_scheduler:
 
         return finished_ids
 
-    def schedule(self):
+    def schedule(self, comm_thres=1, adaDual=True):
 
         for job in self.job_set:
             job.initial_task()
@@ -322,7 +331,7 @@ class job_scheduler:
             #comm_jobs = sorted(comm_jobs, key=lambda x: (-x.model_size))
             comm_jobs = sorted(comm_jobs, key=lambda x: (-x.nworkers, -x.model_size))
             for job in comm_jobs:
-                if job.is_all_nodes_free(time, thres=0):
+                if job.is_all_nodes_free(time, thres=comm_thres, adaDual):
                     comm_task = job.get_comm()
                     for node in job.nodes:
                         node.add_run(comm_task, time)
@@ -381,6 +390,12 @@ class job_scheduler:
             time += 1
 
         self.total_time = time
+
+        # print the comm algo
+        if adaDual:
+            print "Scheduling Algorithm: adaDual enabled, thres=%d." % comm_thres
+        else:
+            print "Scheduling Algorithm: adaDual disabled, thres=%d." % comm_thres
                 
     def print_stat(self):
 
@@ -445,13 +460,26 @@ num_jobs = 16
 #jobG.random_generate()
 #jobS = job_scheduler("test_%djobs" % num_jobs)
 
-#jobG = job_generator("microsoft-480", 480)
+#jobG = job_generator("microsoft-160", 160)
 #jobG.microsoft_generate()
 
-#jobS = job_scheduler("microsoft-80")
-#jobS.allocate(big_first=False, pick_thres=32)
-jobS = job_scheduler("microsoft-80")
-jobS.allocate(big_first=True)
+# compare different placement
+#jobS = job_scheduler("microsoft-160")
+#jobS.allocate(algo="random")
+#jobS = job_scheduler("microsoft-160")
+#jobS.allocate(algo="ssf", pick_thres=4)
+#jobS = job_scheduler("microsoft-160")
+#jobS.allocate(algo="slf", pick_thres=4)
+#jobS = job_scheduler("microsoft-160")
+#jobS.allocate(algo="bsf")
+
+jobS = job_scheduler("microsoft-160")
+jobS.allocate(algo="blf")
 #jobS.print_jobs()
-jobS.schedule()
+
+# compare three comm algos
+jobS.schedule(thres=0, adaDual=False)
+jobS.schedule(thres=1, adaDual=False)
+jobS.schedule(thres=1, adaDual=True)
 jobS.print_stat()
+
