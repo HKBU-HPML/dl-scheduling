@@ -331,7 +331,7 @@ class job_scheduler:
             #comm_jobs = sorted(comm_jobs, key=lambda x: (-x.model_size))
             comm_jobs = sorted(comm_jobs, key=lambda x: (-x.nworkers, -x.model_size))
             for job in comm_jobs:
-                if job.is_all_nodes_free(time, thres=comm_thres, adaDual):
+                if job.is_all_nodes_free(time, thres=comm_thres, adaDual=adaDual):
                     comm_task = job.get_comm()
                     for node in job.nodes:
                         node.add_run(comm_task, time)
@@ -405,6 +405,8 @@ class job_scheduler:
                 print "\t gpu-%d: %d / %d." % (gpu.gpu_id, gpu.active_time, self.total_time)
 
         aver_job_time = np.mean([j.finish_time for j in self.job_set])
+        print "Job Completion Time:"
+        print [j.finish_time for j in self.job_set]
         print "Average Job Completion Time is %f ms." % aver_job_time
 
     def write_allocate(self):
@@ -478,8 +480,8 @@ jobS.allocate(algo="blf")
 #jobS.print_jobs()
 
 # compare three comm algos
-jobS.schedule(thres=0, adaDual=False)
-jobS.schedule(thres=1, adaDual=False)
-jobS.schedule(thres=1, adaDual=True)
+jobS.schedule(comm_thres=0, adaDual=False)
+#jobS.schedule(comm_thres=1, adaDual=False)
+#jobS.schedule(comm_thres=1, adaDual=True)
 jobS.print_stat()
 
