@@ -96,7 +96,7 @@ class dag_job:
     def add_gpu(self, gpu):
         self.gpus.append(gpu)
 
-    def is_all_nodes_free(self, time, thres=0):
+    def is_all_nodes_free(self, time, thres=0, adaDual=True):
         num_comm = 0
         comm_tasks = []
         for node in self.nodes:
@@ -106,8 +106,7 @@ class dag_job:
                     if not task in comm_tasks:
                         comm_tasks.append(task)
 
-        #return True if num_comm <= thres else False
-        if thres != 1:
+        if (not adaDual) or (thres != 1) :
             return True if num_comm <= thres else False
         else:
             if num_comm == 0:
