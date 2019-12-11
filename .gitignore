@@ -3,3 +3,4 @@ runs/
 *.swp
 *.log
 *.pyc
+job_configs/microsoft-*
