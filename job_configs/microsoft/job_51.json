@@ -1,0 +1,3 @@
+{batch_size: 128, bw_time: 185, cuda_enabled: 1, data_dir: data, dataset: imagenet,
+  dnn: googlenet, fw_time: 120, iters: 18, job_id: 51, job_name: j51, lr: 0.1, model_size: 26.7,
+  nsteps_update: 1, nworkers: 4}

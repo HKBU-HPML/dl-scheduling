@@ -173,6 +173,7 @@ class job_scheduler:
         self.num_jobs = len(self.job_files)
 
         self.job_set = []
+        self.json_set = []
         self.load_job_set()
 
         self.clust = cluster(CLUSTER)
@@ -194,6 +195,7 @@ class job_scheduler:
             with open(jf, 'r') as f:
                 job_json = yaml.safe_load(f)
                 self.job_set.append(dag_job(job_json))
+                self.json_set.append(job_json)
 
     def allocate(self, big_first=False, pick_thres=32):
         
@@ -406,11 +408,12 @@ class job_scheduler:
             
         for idx, job in enumerate(self.job_set):
 
-            schedule = job.copy()
+            job_json = job.job_conf
+            schedule = job_json.copy()
 
             # allocate nodes and GPUs
-            node_gpu = gpu_allocate(job['nworkers'])
-            hostfile = os.path.join(self.job_root, "cluster_j%d" % job['job_id'])
+            node_gpu = gpu_allocate(job_json['nworkers'])
+            hostfile = os.path.join(self.job_root, "cluster_j%d" % job_json['job_id'])
             schedule["hostfile"] = hostfile
             schedule["gpus"] = []
             with open(hostfile, "w") as f:
@@ -420,12 +423,12 @@ class job_scheduler:
             
             # schedule the tasks
             schedule["schedule"] = {}
-            for r in range(job['nworkers']):
+            for r in range(job_json['nworkers']):
                 tmp_plan = {}
                 f = []
                 b = []
                 c = []
-                for i in range(job['iters']):
+                for i in range(job_json['iters']):
                     f.append(0)
                     b.append(0)
                     c.append(0)
@@ -440,7 +443,10 @@ class job_scheduler:
     def write_schedule(self):
         pass
 
-num_jobs = 16
+num_jobs = 4
+jobG = job_generator("test_%djobs" % num_jobs, num_jobs)
+jobS = job_scheduler("test_%djobs" % num_jobs)
+jobS.write_allocate()
 #jobG = job_generator("test_%djobs" % num_jobs, num_jobs)
 #jobG.random_generate()
 #jobS = job_scheduler("test_%djobs" % num_jobs)
@@ -450,8 +456,8 @@ num_jobs = 16
 
 #jobS = job_scheduler("microsoft-80")
 #jobS.allocate(big_first=False, pick_thres=32)
-jobS = job_scheduler("microsoft-80")
-jobS.allocate(big_first=True)
-#jobS.print_jobs()
-jobS.schedule()
-jobS.print_stat()
+#jobS = job_scheduler("microsoft-80")
+#jobS.allocate(big_first=True)
+##jobS.print_jobs()
+#jobS.schedule()
+#jobS.print_stat()

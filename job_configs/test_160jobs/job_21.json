@@ -1,0 +1,3 @@
+{batch_size: 20, bw_time: 100, cuda_enabled: 1, data_dir: data, dataset: ptb, dnn: lstm,
+  fw_time: 100, iters: 29, job_id: 21, job_name: j21, lr: 0.1, model_size: 100, nsteps_update: 1,
+  nworkers: 4}

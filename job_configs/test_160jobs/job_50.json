@@ -1,0 +1,3 @@
+{batch_size: 8, bw_time: 100, cuda_enabled: 1, data_dir: data, dataset: imagenet,
+  dnn: resnet50, fw_time: 100, iters: 93, job_id: 50, job_name: j50, lr: 0.1, model_size: 100,
+  nsteps_update: 1, nworkers: 8}

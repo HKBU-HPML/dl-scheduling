@@ -1,13 +1,13 @@
-batch_size: 32
+batch_size: 20
 bw_time: 100
 cuda_enabled: 1
 data_dir: data
-dataset: cifar10
-dnn: resnet20
+dataset: an4
+dnn: lstman4
 fw_time: 100
-gpus: [0, 1, 0, 1]
+gpus: [-1, -1, -1, -1]
 hostfile: job_configs/test_4jobs/cluster_j0
-iters: 10
+iters: 5
 job_id: 0
 job_name: j0
 lr: 0.1
@@ -16,18 +16,18 @@ nsteps_update: 1
 nworkers: 4
 schedule:
   rank_0:
-    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    backward: [0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0]
   rank_1:
-    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    backward: [0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0]
   rank_2:
-    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    backward: [0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0]
   rank_3:
-    backward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    comm: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    forward: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    backward: [0, 0, 0, 0, 0]
+    comm: [0, 0, 0, 0, 0]
+    forward: [0, 0, 0, 0, 0]
