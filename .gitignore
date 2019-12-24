@@ -1,7 +1,6 @@
 data/
 runs/
 *.swp
-*.log
 *.pyc
 job_configs/
-*.raw
+logs/
