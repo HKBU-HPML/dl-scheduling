@@ -1,3 +1,0 @@
-{batch_size: 32, bw_time: 100, cuda_enabled: 1, data_dir: data, dataset: cifar10,
-  dnn: resnet20, fw_time: 100, iters: 284, job_id: 9, job_name: j9, lr: 0.1, model_size: 100,
-  nsteps_update: 1, nworkers: 8}
