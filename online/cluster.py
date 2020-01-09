@@ -24,6 +24,18 @@ class gpu:
         self.active_time = 0
         self.makespan = 0
 
+        # gpu memory resource
+        self.allocated_mem = 0
+        self.rest_mem = self.gpu_mem
+
+    def free_mem(self, model_size):
+        self.allocated_mem -= model_size
+        self.rest_mem += model_size
+
+    def allocate_mem(self, model_size):
+        self.allocated_mem += model_size
+        self.rest_mem -= model_size
+
     # allocate stage
     def add_job(self, job, worker_id, max_makespan):
         self.job_list.append(job)

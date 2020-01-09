@@ -65,6 +65,7 @@ class dag_job:
         self.model_size = job_json["model_size"]
         self.fw_time = job_json["fw_time"]
         self.bw_time = job_json["bw_time"]
+        self.start_time = job_json["start_time"]
     
         # job compute workload
         self.compute_duration = (self.fw_time + self.bw_time) * self.iters
@@ -83,6 +84,14 @@ class dag_job:
         self.comm_task = dag_task(self, 0, "comm")
         self.is_comm_stall = False
         self.finish_time = 0
+
+    def release_gpu_memory(self):
+        for gpu in self.gpus:
+            gpu.free_mem(self.model_size)
+
+    def allocate_gpu_memory(self):
+        for gpu in self.gpus:
+            gpu.allocate_mem(self.model_size)
 
     def add_node(self, node):
         self.nodes.append(node)

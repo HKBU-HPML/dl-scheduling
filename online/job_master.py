@@ -20,7 +20,8 @@ TEMPLATES = {
              #"alexnet": {"model_size":235, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":22, "bw_time":42, "batch_size":64},
 }
 
-CLUSTER = {"num_node": 16, "num_gpu":4, "gpu_mem":8192, "cpu_mem":16384, "network_speed": 128} # unit is MB. 
+CLUSTER = {"num_node": 16, "num_gpu":4, "gpu_mem":8192, "cpu_mem":16384, "network_speed": 128} # unit is MB.
+ARRIVAL_MAX = 1440
 
 class job_generator:
 
@@ -45,6 +46,7 @@ class job_generator:
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
             job_json["iters"] = randint(5, 50)
+            job_json["start_time"] = randint(0, 1000)
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -76,6 +78,7 @@ class job_generator:
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
             job_json["iters"] = randint(min_iter, max_iter) * 2
+            job_json["start_time"] = randint(0, 1000)
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -93,6 +96,7 @@ class job_generator:
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
             job_json["iters"] = randint(min_iter, max_iter) * 2
+            job_json["start_time"] = randint(0, 1000)
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -110,6 +114,7 @@ class job_generator:
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
             job_json["iters"] = randint(min_iter, max_iter) * 2 
+            job_json["start_time"] = randint(0, 1000)
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -127,6 +132,7 @@ class job_generator:
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
             job_json["iters"] = randint(min_iter, max_iter)
+            job_json["start_time"] = randint(0, 1000)
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -144,6 +150,7 @@ class job_generator:
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
             job_json["iters"] = randint(min_iter, max_iter)
+            job_json["start_time"] = randint(0, 1000)
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -161,6 +168,7 @@ class job_generator:
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
             job_json["iters"] = randint(min_iter, max_iter)
+            job_json["start_time"] = randint(0, 1000)
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -173,9 +181,11 @@ class job_scheduler:
         self.job_files = glob.glob(r'job_configs/%s/job*.json' % set_name)
         self.num_jobs = len(self.job_files)
 
-        self.job_set = []
-        self.json_set = []
+        self.job_set = [[] for i in range(ARRIVAL_MAX)] # simulate one day of 1440 minutes
         self.load_job_set()
+
+        self.job_queue = {}
+        self.job_running = {}
 
         self.clust = cluster(CLUSTER)
 
@@ -195,8 +205,7 @@ class job_scheduler:
         for jf in self.job_files:
             with open(jf, 'r') as f:
                 job_json = yaml.safe_load(f)
-                self.job_set.append(dag_job(job_json))
-                self.json_set.append(job_json)
+                self.job_set[job_json["start_time"]].append(dag_job(job_json))
 
     def allocate(self, algo="blf", pick_thres=32): # "ssf", "slf", "bsf", "blf", "random" 
  
@@ -291,9 +300,10 @@ class job_scheduler:
 
     def check_finished(self):
         finished_ids = []
-        for job in self.job_set:
+        for job in self.job_running:
             if job.is_finished:
                 finished_ids.append(job.job_id)
+                job.release_gpu_mem()
 
         return finished_ids
 
@@ -304,11 +314,10 @@ class job_scheduler:
 
         cur_time = 0
         
-        job_id_pool = [job.job_id for job in self.job_set]
+        finished_ids = []
 
         time = 0
-        num_finished_jobs = 0
-        while len(job_id_pool) != 0:
+        while len(finished_jobs) != self.job_num:
 
             print_log = ""
 
@@ -316,11 +325,12 @@ class job_scheduler:
             for node in self.clust.node_list:
                 node.update_status(time)
 
-            finished_job_ids = self.check_finished()
-            if len(finished_job_ids) > num_finished_jobs:
-                num_finished_jobs = len(finished_job_ids)
-                print_log += "finished: %s\n" % finished_job_ids
-                job_id_pool = [job_id for job_id in job_id_pool if job_id not in finished_job_ids]
+            # process those finished jobs, record them
+            finished_ids.extend(self.check_finished())
+
+            # allocate resources for jobs in the queue, placement them if some GPUs are available
+            self.allocate(algo="blf", time=time)
+            job_running.extend(new_allocate_jobs)
 
             comm_jobs = []
             for job in self.job_set:
@@ -460,16 +470,13 @@ class job_scheduler:
     def write_schedule(self):
         pass
 
-num_jobs = 4
-jobG = job_generator("test_%djobs" % num_jobs, num_jobs)
-jobS = job_scheduler("test_%djobs" % num_jobs)
-jobS.write_allocate()
+#num_jobs = 4
+#jobG = job_generator("test_%djobs" % num_jobs, num_jobs)
+#jobS = job_scheduler("test_%djobs" % num_jobs)
+#jobS.write_allocate()
 #jobG = job_generator("test_%djobs" % num_jobs, num_jobs)
 #jobG.random_generate()
 #jobS = job_scheduler("test_%djobs" % num_jobs)
-
-#jobG = job_generator("microsoft-160", 160)
-#jobG.microsoft_generate()
 
 #jobS = job_scheduler("microsoft-80")
 #jobS.allocate(big_first=False, pick_thres=32)
@@ -488,7 +495,9 @@ jobS.write_allocate()
 #jobS = job_scheduler("microsoft-160")
 #jobS.allocate(algo="bsf")
 
-jobS = job_scheduler("microsoft-160")
+jobG = job_generator("microsoft-80", 80)
+jobG.microsoft_generate()
+jobS = job_scheduler("microsoft-80")
 jobS.allocate(algo="blf")
 #jobS.print_jobs()
 
