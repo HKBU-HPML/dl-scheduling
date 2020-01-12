@@ -28,13 +28,13 @@ class gpu:
         self.allocated_mem = 0
         self.rest_mem = self.gpu_mem
 
-    def free_mem(self, model_size):
-        self.allocated_mem -= model_size
-        self.rest_mem += model_size
+    def free_mem(self, train_mem):
+        self.allocated_mem -= train_mem
+        self.rest_mem += train_mem
 
-    def allocate_mem(self, model_size):
-        self.allocated_mem += model_size
-        self.rest_mem -= model_size
+    def allocate_mem(self, train_mem):
+        self.allocated_mem += train_mem
+        self.rest_mem -= train_mem
 
     # allocate stage
     def add_job(self, job, worker_id):
@@ -109,7 +109,7 @@ class node:
         self.net_spd = net_spd
         self.node_id = node_id
 
-        self.gpu_list = [gpu(mem=819, gpu_id=i, host_node=self) for i in range(self.num_gpu)]
+        self.gpu_list = [gpu(mem=32768, gpu_id=i, host_node=self) for i in range(self.num_gpu)]
         self.comm_task_list = []
         self.event_start_time = []
         self.event_end_time = []
@@ -118,10 +118,18 @@ class node:
         self.net_load = 0
         self.compute_load = 0
 
-        self.net_conf = {"full_speed": 128.0,
+        ## 1G ethernet
+        #self.net_conf = {"full_speed": 128.0,
+        #                 "alpha": 0.0,
+        #                 "beta": 100.0 / 128.0,
+        #                 "eta": 0.7,
+        #                 "num_of_task": 0}
+
+        # 10G ethernet, time:ms, message size:MB
+        self.net_conf = {"full_speed": 1.28,
                          "alpha": 0.0,
-                         "beta": 100.0 / 128.0,
-                         "eta": 0.7,
+                         "beta": 0.856,
+                         "eta": 0.235,
                          "num_of_task": 0}
 
         # record the variable for scheduling

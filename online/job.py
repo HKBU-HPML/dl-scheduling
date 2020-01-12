@@ -64,6 +64,7 @@ class dag_job:
         self.dataset = job_json["dataset"]
         self.iters = job_json["iters"]
         self.model_size = job_json["model_size"]
+        self.train_mem = job_json["train_mem"]
         self.fw_time = job_json["fw_time"]
         self.bw_time = job_json["bw_time"]
         self.start_time = job_json["start_time"]
@@ -97,11 +98,11 @@ class dag_job:
 
     def release_gpu_memory(self):
         for gpu in self.gpus:
-            gpu.free_mem(self.model_size)
+            gpu.free_mem(self.train_mem)
 
     def allocate_gpu_memory(self):
         for gpu in self.gpus:
-            gpu.allocate_mem(self.model_size)
+            gpu.allocate_mem(self.train_mem)
 
     def add_node(self, node):
         self.nodes.append(node)
@@ -132,7 +133,8 @@ class dag_job:
                 return True
             if num_comm == 1:
                 #print "debug:", len(comm_tasks)
-                judge = 2 + 4 * 0.7 / 7.8125
+                #judge = 0.856 / (2 * (0.856 + 0.235))
+                judge = (2 * (0.856 + 0.235)) / 0.856
                 #cur_size = comm_tasks[0].get_rest_size(time)
                 #if (cur_size * 1.0 / self.model_size) > judge:
                 #    return True

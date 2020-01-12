@@ -4,25 +4,27 @@ import json, yaml
 from cluster import *
 from job import dag_job
 import numpy as np
-import random
+import random, math
 import operator
 
 #SUPPORT_NETS = ["resnet20", "lstm", "lstman4", "resnet50"]
-SUPPORT_NETS = ["resnet50", "googlenet", "alexnet"]
+SUPPORT_NETS = ["vgg16", "resnet50", "inception-v3", "lstm"]
 TEMPLATES = {
              #"resnet20": {"model_size":100, "lr":0.1, "dataset":"cifar10", "data_dir":"data", "fw_time":100, "bw_time":100, "batch_size":32},
-             #"lstm": {"model_size":100, "lr":0.1, "dataset":"ptb", "data_dir":"data", "fw_time":100, "bw_time":100, "batch_size":20},
              #"lstman4": {"model_size":100, "lr":0.1, "dataset":"an4", "data_dir":"data", "fw_time":100, "bw_time":100, "batch_size":20},
-             "resnet50": {"model_size":97.7, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":38, "bw_time":67, "batch_size":16},
-             "googlenet": {"model_size":26.7, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":60, "bw_time":92, "batch_size":64},
-             "alexnet": {"model_size":235, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":45, "bw_time":85, "batch_size":256},
+             "lstm": {"model_size":251.8, "lr":0.1, "dataset":"ptb", "data_dir":"data", "fw_time":32, "bw_time":47, "batch_size":64, "train_mem":2751},
+             "vgg16": {"model_size":526.4, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":36, "bw_time":54, "batch_size":16, "train_mem":4527},
+             "resnet50": {"model_size":99.2, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":25, "bw_time":37, "batch_size":16, "train_mem":3213},
+             "inception-v3": {"model_size":103.0, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":35, "bw_time":52, "batch_size":16, "train_mem":3291},
+             #"alexnet": {"model_size":235, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":45, "bw_time":85, "batch_size":256},
              #"resnet50": {"model_size":97.7, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":19, "bw_time":33, "batch_size":4},
              #"googlenet": {"model_size":26.7, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":30, "bw_time":46, "batch_size":16},
              #"alexnet": {"model_size":235, "lr":0.1, "dataset":"imagenet", "data_dir":"data", "fw_time":22, "bw_time":42, "batch_size":64},
 }
 
-CLUSTER = {"num_node": 16, "num_gpu":4, "gpu_mem":819, "cpu_mem":16384, "network_speed": 128} # unit is MB.
-ARRIVAL_MAX = 1440
+CLUSTER = {"num_node": 16, "num_gpu":4, "gpu_mem":32768, "cpu_mem":16384, "network_speed": 1.28} # unit is MB.
+scale = 1
+ARRIVAL_MAX = 1200 * scale # 1.2 seconds
 
 class job_generator:
 
@@ -65,8 +67,9 @@ class job_generator:
         if not os.path.exists(self.job_root):
             os.makedirs(self.job_root)
 
-        min_iter = 50
-        max_iter = 300
+        min_iter = 1 * scale
+        max_iter = 6 * scale
+
         # 1-GPU jobs
         for i in range(job_dist[0]):
             job_json = {}
@@ -79,8 +82,8 @@ class job_generator:
             job_json["nworkers"] = 1
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
-            job_json["iters"] = randint(min_iter, max_iter) * 2
-            job_json["start_time"] = randint(0, 1000)
+            job_json["iters"] = randint(min_iter, max_iter) 
+            job_json["start_time"] = int(math.floor(np.random.uniform(0, ARRIVAL_MAX)))
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -97,8 +100,8 @@ class job_generator:
             job_json["nworkers"] = 2
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
-            job_json["iters"] = randint(min_iter, max_iter) * 2
-            job_json["start_time"] = randint(0, 1000)
+            job_json["iters"] = randint(min_iter, max_iter) 
+            job_json["start_time"] = int(math.floor(np.random.uniform(0, ARRIVAL_MAX)))
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -115,8 +118,8 @@ class job_generator:
             job_json["nworkers"] = 4
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
-            job_json["iters"] = randint(min_iter, max_iter) * 2 
-            job_json["start_time"] = randint(0, 1000)
+            job_json["iters"] = randint(min_iter, max_iter) 
+            job_json["start_time"] = int(math.floor(np.random.uniform(0, ARRIVAL_MAX)))
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -134,7 +137,7 @@ class job_generator:
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
             job_json["iters"] = randint(min_iter, max_iter)
-            job_json["start_time"] = randint(0, 1000)
+            job_json["start_time"] = int(math.floor(np.random.uniform(0, ARRIVAL_MAX)))
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -152,7 +155,7 @@ class job_generator:
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
             job_json["iters"] = randint(min_iter, max_iter)
-            job_json["start_time"] = randint(0, 1000)
+            job_json["start_time"] = int(math.floor(np.random.uniform(0, ARRIVAL_MAX)))
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -170,7 +173,7 @@ class job_generator:
             job_json["nsteps_update"] = 1
             job_json["cuda_enabled"] = 1
             job_json["iters"] = randint(min_iter, max_iter)
-            job_json["start_time"] = randint(0, 1000)
+            job_json["start_time"] = int(math.floor(np.random.uniform(0, ARRIVAL_MAX)))
 
             with open(os.path.join(self.job_root, "job_%d.json"%i), "w") as f:
                 yaml.safe_dump(job_json, f)
@@ -216,7 +219,7 @@ class job_scheduler:
 
             selected_gpus = [] 
             if job.nworkers <= pick_thres:
-                available_gpus = [gpu for gpu in self.clust.gpu_list if gpu.rest_mem >= job.model_size]
+                available_gpus = [gpu for gpu in self.clust.gpu_list if gpu.rest_mem >= job.train_mem]
                 # select the gpu with the minimum makespan
                 available_gpus = sorted(available_gpus, key=lambda x: (x.makespan, x.node_id))
                 #print ["n%d-g%d-%d" % (g.node_id, g.gpu_id, g.makespan) for g in self.clust.gpu_list]
@@ -231,7 +234,7 @@ class job_scheduler:
 
                 available_gpus = []
                 for node in self.clust.node_list:
-                    available_gpus.extend([gpu for gpu in node.gpu_list if gpu.rest_mem >= job.model_size])
+                    available_gpus.extend([gpu for gpu in node.gpu_list if gpu.rest_mem >= job.train_mem])
 
                 if len(available_gpus) >= job.nworkers:
                     selected_gpus = available_gpus[:job.nworkers]
@@ -327,7 +330,11 @@ class job_scheduler:
                 node.update_status(time)
 
             # process those finished jobs, record them
-            finished_ids.extend(self.check_finished())
+            tmp_finished_ids = self.check_finished()
+            if len(tmp_finished_ids) != 0:
+                finished_ids.extend(tmp_finished_ids)
+                finished_ids.sort()
+                print_log += "Finished ID: %s.\n" % finished_ids
 
             # enqueue new arriving jobs
             if time < ARRIVAL_MAX:
@@ -486,17 +493,21 @@ class job_scheduler:
     def write_schedule(self):
         pass
 
-# random job set for test
-num_jobs = 64
-#jobG = job_generator("test_%djobs" % num_jobs, num_jobs)
-#jobG.random_generate()
-jobS = job_scheduler("test_%djobs" % num_jobs)
+## random job set for test
+#num_jobs = 32
+##jobG = job_generator("test_%djobs" % num_jobs, num_jobs)
+##jobG.random_generate()
+#jobS = job_scheduler("test_%djobs" % num_jobs)
 
 ## microsoft-80 job set
 #jobG = job_generator("microsoft-80", 80)
 #jobG.microsoft_generate()
 #jobS = job_scheduler("microsoft-80")
-##jobS.print_jobs()
+
+# microsoft-160 job set
+#jobG = job_generator("microsoft-160", 160)
+#jobG.microsoft_generate()
+jobS = job_scheduler("microsoft-160")
 
 # compare three comm algos
 adopted_algo = 'blf-2-srsf-0-true'
