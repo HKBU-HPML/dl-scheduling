@@ -23,7 +23,7 @@ TEMPLATES = {
 }
 
 CLUSTER = {"num_node": 16, "num_gpu":4, "gpu_mem":32768, "cpu_mem":16384, "network_speed": 1.28} # unit is MB.
-scale = 1
+scale = 10
 ARRIVAL_MAX = 1200 * scale # 1.2 seconds
 
 class job_generator:
