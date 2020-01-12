@@ -17,8 +17,9 @@ class dag_task:
         self.start_time = time
         self.last_change_time = time
         self.transferred_size = 0
-        self.speed = 0.128
+        self.speed = 1.28
         self.end_time = time + self.model_size / self.speed
+        print "job-%d: estimated ending time: %f." % (self.parent_job.job_id, self.end_time), self.model_size, self.speed
         #self.end_time = time + 40
 
     def is_done(self, time):
@@ -70,7 +71,14 @@ class dag_job:
         # job compute workload
         self.compute_duration = (self.fw_time + self.bw_time) * self.iters
         self.gpu_compute_cumul_duration = self.compute_duration * self.nworkers
-        self.comm_duration = self.model_size * self.iters
+
+        # job comm workload
+        self.comm_duration = 0
+        self.comm_duration_once = 0
+
+        # job runtime workload
+        self.remain_compute_workload = self.compute_duration
+        self.remain_compute_cumul_workload = self.gpu_compute_cumul_duration
 
         self.available_tasks = ["" for i in range(self.job_conf["nworkers"])]
         self.finished_tasks = []
@@ -84,6 +92,8 @@ class dag_job:
         self.comm_task = dag_task(self, 0, "comm")
         self.is_comm_stall = False
         self.finish_time = 0
+
+        self.sync_iter = 0
 
     def release_gpu_memory(self):
         for gpu in self.gpus:
@@ -155,6 +165,11 @@ class dag_job:
     def sync_comm(self, time):
         self.is_communicated = [-1 for i in range(self.nworkers)]
         self.is_comm_stall = False
+
+        # decrease gpu comm workload(makespan)
+        for gpu in self.gpus:
+            gpu.makespan -= self.comm_duration_once
+
         if self.available_tasks[0]["iter"] < self.iters:
             for i in range(self.nworkers):
                 self.available_tasks[i]["iter"] += 1
@@ -163,7 +178,8 @@ class dag_job:
             #self.is_communicated = [-1 for i in range(self.nworkers)]
         else:
             self.is_finished = True
-            self.finish_time = time
+            self.finish_time = time - self.start_time
+        self.remain_compute_workload -= (self.fw_time + self.bw_time) 
 
     def get_task(self, worker_id):
         return self.available_tasks[worker_id]
@@ -175,11 +191,15 @@ class dag_job:
 
         cur_task = str(self.available_tasks[worker_id])
         if self.available_tasks[worker_id]["type"] == "fw":
+            self.gpus[worker_id].makespan -= self.fw_time
             self.available_tasks[worker_id]["type"] = "bw"
+            self.remain_compute_cumul_workload -= self.fw_time
 
         elif self.available_tasks[worker_id]["type"] == "bw":
+            self.gpus[worker_id].makespan -= self.bw_time
             self.available_tasks[worker_id]["type"] = "comm"
             self.is_communicated[worker_id] = 1
+            self.remain_compute_cumul_workload -= self.bw_time
 
         #elif self.available_tasks[worker_id]["type"] == "comm":
         #    #self.is_communicated[worker_id] = 0

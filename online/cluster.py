@@ -1,4 +1,5 @@
 from job import dag_task, dag_job
+import numpy as np
 
 class gpu:
 
@@ -13,7 +14,6 @@ class gpu:
         self.task_list = []
 
         self.allocated_mem = 0
-        self.free_mem = self.gpu_mem
         self.workload = 0
 
         self.is_busy = False
@@ -37,12 +37,11 @@ class gpu:
         self.rest_mem -= model_size
 
     # allocate stage
-    def add_job(self, job, worker_id, max_makespan):
+    def add_job(self, job, worker_id):
         self.job_list.append(job)
         self.wk_id_list.append(worker_id)
 
-        self.makespan = max_makespan + job.compute_duration
-
+        self.makespan += job.compute_duration + job.comm_duration
         job.add_gpu(self)
 
     #def get_ready_jobs(self):
@@ -110,7 +109,7 @@ class node:
         self.net_spd = net_spd
         self.node_id = node_id
 
-        self.gpu_list = [gpu(mem=8192, gpu_id=i, host_node=self) for i in range(self.num_gpu)]
+        self.gpu_list = [gpu(mem=819, gpu_id=i, host_node=self) for i in range(self.num_gpu)]
         self.comm_task_list = []
         self.event_start_time = []
         self.event_end_time = []
@@ -121,7 +120,7 @@ class node:
 
         self.net_conf = {"full_speed": 128.0,
                          "alpha": 0.0,
-                         "beta": 1000.0 / 128.0,
+                         "beta": 100.0 / 128.0,
                          "eta": 0.7,
                          "num_of_task": 0}
 
@@ -140,7 +139,8 @@ class node:
         #    self.gpu_list[0].add_job(job, allocated_worker + i)
    
     def update_makespan(self):
-        self.makespan = max([g.makespan for g in self.gpu_list])
+        #self.makespan = max([g.makespan for g in self.gpu_list])
+        self.makespan = np.mean([g.makespan for g in self.gpu_list])
 
     def add_run(self, comm_task, time):
         comm_task.set_time(time)
