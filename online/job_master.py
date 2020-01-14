@@ -213,31 +213,47 @@ class job_scheduler:
                 job_json = yaml.safe_load(f)
                 self.job_set[job_json["start_time"]].append(dag_job(job_json))
 
-    def allocate(self, time, algo="blf", pick_thres=32, starve_thres=999999): # "ssf", "slf", "bsf", "blf", "random" 
+    def allocate(self, time, algo="blf", pick_str="lnwf", starve_thres=999999): # "ssf", "slf", "bsf", "blf", "random" 
  
-        def pick_gpus(job, pick_thres):
+        def pick_gpus(job, pick_str):
 
-            selected_gpus = [] 
-            if job.nworkers <= pick_thres:
+            selected_gpus = []
+            
+            if pick_str == "random":
                 available_gpus = [gpu for gpu in self.clust.gpu_list if gpu.rest_mem >= job.train_mem]
-                # select the gpu with the minimum makespan
-                available_gpus = sorted(available_gpus, key=lambda x: (x.makespan, x.node_id))
-                #print ["n%d-g%d-%d" % (g.node_id, g.gpu_id, g.makespan) for g in self.clust.gpu_list]
+                random.shuffle(available_gpus)
                 if len(available_gpus) >= job.nworkers:
                     selected_gpus = available_gpus[:job.nworkers]
 
-            else:
-                # select nodes with least makespan
-                for host_node in self.clust.node_list:
-                    host_node.update_makespan()
-                self.clust.node_list = sorted(self.clust.node_list, key=lambda x: (x.makespan))
-
-                available_gpus = []
-                for node in self.clust.node_list:
-                    available_gpus.extend([gpu for gpu in node.gpu_list if gpu.rest_mem >= job.train_mem])
-
+            if pick_str == "bp":
+                available_gpus = [gpu for gpu in self.clust.gpu_list if gpu.rest_mem >= job.train_mem]
                 if len(available_gpus) >= job.nworkers:
                     selected_gpus = available_gpus[:job.nworkers]
+
+            elif "lwf" in pick_str:
+                pick_thres = int(pick_str[3:])
+                if job.nworkers <= pick_thres:
+                    available_gpus = [gpu for gpu in self.clust.gpu_list if gpu.rest_mem >= job.train_mem]
+                    # select the gpu with the minimum makespan
+                    available_gpus = sorted(available_gpus, key=lambda x: (x.makespan, x.node_id))
+                    #print ["n%d-g%d-%d" % (g.node_id, g.gpu_id, g.makespan) for g in self.clust.gpu_list]
+                    if len(available_gpus) >= job.nworkers:
+                        selected_gpus = available_gpus[:job.nworkers]
+
+                else:
+                    # select nodes with least makespan
+                    for host_node in self.clust.node_list:
+                        host_node.update_makespan()
+                    self.clust.node_list = sorted(self.clust.node_list, key=lambda x: (x.makespan))
+
+                    available_gpus = []
+                    for node in self.clust.node_list:
+                        sort_gpus_in_node = [gpu for gpu in node.gpu_list if gpu.rest_mem >= job.train_mem]
+                        sort_gpus_in_node = sorted(sort_gpus_in_node, key=lambda x:x.makespan)
+                        available_gpus.extend(sort_gpus_in_node)
+
+                    if len(available_gpus) >= job.nworkers:
+                        selected_gpus = available_gpus[:job.nworkers]
             
             # not enough available gpus
             if len(selected_gpus) == 0:
@@ -291,12 +307,12 @@ class job_scheduler:
         for job in self.starve_queue:
 
             # place the job
-            pick_gpus(job, pick_thres)
+            pick_gpus(job, pick_str)
             #print ["job-%d-%d to n-%d g-%d" % (job.job_id, job.compute_duration, g.node_id, g.gpu_id) for g in selected_gpus]
 
         for job in self.job_queue:
             # place the job
-            pick_gpus(job, pick_thres)
+            pick_gpus(job, pick_str)
             #print ["job-%d-%d to n-%d g-%d" % (job.job_id, job.compute_duration, g.node_id, g.gpu_id) for g in selected_gpus]
 
     def check_finished(self):
@@ -309,7 +325,7 @@ class job_scheduler:
 
         return finished_ids
 
-    def schedule(self, place_str='blf', pt=2, schedule_str='srsf', comm_thres=1, adaDual=True):
+    def schedule(self, place_str='blf', pick_gpu='lswf', schedule_str='srsf', comm_thres=1, adaDual=True, starve_thres=99999999):
 
         for t in range(0, len(self.job_set)):
             for job in self.job_set[t]:
@@ -320,7 +336,7 @@ class job_scheduler:
         finished_ids = []
 
         time = 0
-        print "Placement Algorithm: %s-%d, starve-free: %d." % (place_str, pt, 999999)
+        print "Placement Algorithm: %s-%s." % (place_str, pick_gpu)
         while len(finished_ids) != self.num_jobs:
 
             print_log = ""
@@ -341,7 +357,7 @@ class job_scheduler:
                 self.job_queue.extend(self.job_set[time])
 
             # allocate resources(GPUs and their memory) for jobs in the queue, placement them if some GPUs are available
-            self.allocate(time, algo=place_str, pick_thres=pt)
+            self.allocate(time, algo=place_str, pick_str=pick_gpu, starve_thres=starve_thres)
 
             comm_jobs = []
             for job in self.job_running:
@@ -425,10 +441,30 @@ class job_scheduler:
 
         # print the comm algo
         if adaDual:
-            print "Place Algorithm: %s(%d), Scheduling Algorithm: %s, adaDual enabled, thres=%d." % (place_str, pt, schedule_str, comm_thres)
+            print "Place Algorithm: %s(%s), Scheduling Algorithm: %s, adaDual enabled, thres=%d." % (place_str, pick_gpu, schedule_str, comm_thres)
         else:
-            print "Place Algorithm: %s(%d), Scheduling Algorithm: %s, adaDual disabled, thres=%d." % (place_str, pt, schedule_str, comm_thres)
-                
+            print "Place Algorithm: %s(%s), Scheduling Algorithm: %s, adaDual disabled, thres=%d." % (place_str, pick_gpu, schedule_str, comm_thres)
+             
+    def print_dist(self):
+
+        SS = 0
+        SL = 0
+        LS = 0
+        LL = 0
+        for i in range(ARRIVAL_MAX):
+            for job in self.job_set[i]:
+                if job.nworkers <= 4:
+                    if job.iters <= 16:
+                        SS += 1
+                    else:
+                        SL += 1
+                else:
+                    if job.iters <= 16:
+                        LS += 1
+                    else:
+                        LL += 1
+        print SS, SL, LS, LL
+
     def print_stat(self):
 
         for node in self.clust.node_list:
@@ -438,7 +474,8 @@ class job_scheduler:
 
         job_times = []
         for i in range(ARRIVAL_MAX):
-            job_times.extend([(j.job_id, j.finish_time) for j in self.job_set[i]])
+            #job_times.extend([(j.job_id, j.finish_time) for j in self.job_set[i]])
+            job_times.extend([j.finish_time for j in self.job_set[i]])
         aver_job_time = np.mean(job_times)
         print "Job Completion Time:"
         print job_times
@@ -509,16 +546,16 @@ class job_scheduler:
 #jobG.microsoft_generate()
 jobS = job_scheduler("microsoft-160")
 
-# compare three comm algos
-adopted_algo = 'blf-2-srsf-0-true'
-if len(sys.argv) == 2:
-    adopted_algo = sys.argv[1]
-place_str, pt, schedule_str, comm_thres, adaDual = adopted_algo.split('-')
-pt = int(pt)
-comm_thres = int(comm_thres)
-if adaDual == 'true':
-    adaDual = True
-elif adaDual == 'false':
-    adaDual = False
-jobS.schedule(place_str, pt, schedule_str, comm_thres, adaDual)
-jobS.print_stat()
+jobS.print_dist()
+## compare three comm algos
+#adopted_algo = 'blf-lswf-srsf-0-true'
+#if len(sys.argv) == 2:
+#    adopted_algo = sys.argv[1]
+#place_str, pick_gpu, schedule_str, comm_thres, adaDual = adopted_algo.split('-')
+#comm_thres = int(comm_thres)
+#if adaDual == 'true':
+#    adaDual = True
+#elif adaDual == 'false':
+#    adaDual = False
+#jobS.schedule(place_str, pick_gpu, schedule_str, comm_thres, adaDual)
+#jobS.print_stat()
